@@ -1,214 +1,221 @@
 <!doctype html>
 <html lang="de">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#0f172a">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <meta name="apple-mobile-web-app-title" content="Inventur Scan">
-  <title>Inventur Scan</title>
-  <link rel="manifest" href="./manifest.webmanifest">
-  <link rel="apple-touch-icon" href="./icon-192.png">
-  <link rel="stylesheet" href="./styles.css">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#080808">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Inventur Scan">
+<title>Inventur Scan · DJ Innovations</title>
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="apple-touch-icon" href="./icon-192.png">
+<link rel="stylesheet" href="./styles.css">
 </head>
 <body>
-<div class="shell">
-  <header class="topbar">
-    <div class="brand">
-      <div class="brandmark">IS</div>
-      <div><strong>Inventur Scan</strong><span>Mobile Inventur</span></div>
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="side-brand">
+      <img src="./dj-innovations-logo.jpg" alt="DJ Innovations">
+      <div class="product-name">INVENTUR SCAN</div>
     </div>
-    <div class="top-actions">
-      <span id="saveBadge" class="save-badge">Bereit</span>
-      <button class="icon-btn" id="themeBtn" aria-label="Darstellung wechseln">◐</button>
+
+    <nav class="side-nav">
+      <button class="nav-item active" data-page="dashboard"><span>⌂</span>Dashboard</button>
+      <button class="nav-item" data-page="inventory"><span>▣</span>Inventur</button>
+      <button class="nav-item" data-page="articles"><span>◇</span>Artikel</button>
+      <button class="nav-item" data-page="locations"><span>⌖</span>Lagerorte</button>
+      <button class="nav-item" data-page="stats"><span>▥</span>Auswertung</button>
+      <button class="nav-item" data-page="history"><span>◷</span>Historie</button>
+      <button class="nav-item" data-page="settings"><span>⚙</span>Einstellungen</button>
+    </nav>
+
+    <div class="offline-card">
+      <span class="gold-icon">☁</span>
+      <div><strong>Offline-Modus</strong><small>Daten lokal gespeichert</small></div>
     </div>
-  </header>
+  </aside>
 
-  <nav class="nav" aria-label="Hauptnavigation">
-    <button data-page="dashboard" class="nav-btn active"><b>⌂</b><span>Dashboard</span></button>
-    <button data-page="inventory" class="nav-btn"><b>▣</b><span>Inventur</span></button>
-    <button data-page="articles" class="nav-btn"><b>≡</b><span>Artikel</span></button>
-    <button data-page="stats" class="nav-btn"><b>↗</b><span>Auswertung</span></button>
-    <button data-page="history" class="nav-btn"><b>◷</b><span>Historie</span></button>
-    <button data-page="settings" class="nav-btn"><b>⚙</b><span>Einstellungen</span></button>
-  </nav>
+  <main class="main">
+    <header class="topbar">
+      <div>
+        <span class="kicker">DJ INNOVATIONS</span>
+        <h1 id="pageHeading">Dashboard</h1>
+        <p id="pageSubheading">Dein Lagerbestand auf einen Blick.</p>
+      </div>
+      <div class="top-actions">
+        <span class="save-pill" id="saveBadge">Bereit</span>
+        <button class="round-btn" id="themeBtn" aria-label="Darstellung wechseln">◐</button>
+      </div>
+    </header>
 
-  <main>
-    <section id="page-dashboard" class="page active">
-      <div class="hero">
+    <section class="page active" id="page-dashboard">
+      <div class="welcome">
         <div>
-          <span class="eyebrow">INVENTUR</span>
-          <h1>Alles im Bestand.<br>Ohne Zettelwirtschaft.</h1>
-          <p>Importieren, Barcode scannen, Mengen zählen und Abweichungen direkt sehen.</p>
+          <span class="kicker gold">INVENTUR SCAN</span>
+          <h2>Bestand im Blick.<br>Inventur im Griff.</h2>
+          <p>Deine laufende Inventur, Lagerwerte und Abweichungen — alles direkt auf dem Startbildschirm.</p>
         </div>
-        <div class="hero-actions">
-          <button class="btn primary" id="heroStart">Inventur öffnen</button>
-          <label class="btn secondary" for="fileInputDashboard">Bestand importieren</label>
-          <input id="fileInputDashboard" type="file" accept=".csv,.xlsx,.xls" hidden>
+        <div class="welcome-actions">
+          <button class="btn gold-btn" data-go="inventory">Inventur fortsetzen</button>
+          <label class="btn dark-btn" for="dashImport">Bestand importieren</label>
+          <input id="dashImport" type="file" accept=".csv,.xlsx,.xls" hidden>
         </div>
       </div>
 
-      <div class="metrics">
-        <article class="metric"><span>Artikel</span><strong id="dTotal">0</strong><small>im Bestand</small></article>
-        <article class="metric"><span>Erfasst</span><strong id="dCounted">0</strong><small id="dPercent">0 % fertig</small></article>
-        <article class="metric"><span>Abweichungen</span><strong id="dDiffs">0</strong><small>prüfen</small></article>
-        <article class="metric"><span>Lagerwert</span><strong id="dValue">0,00 €</strong><small>gezählt · EK</small></article>
+      <div class="metric-grid">
+        <article class="metric-card">
+          <div class="metric-top"><span>Artikel insgesamt</span><b class="metric-icon">◇</b></div>
+          <strong id="dTotal">0</strong>
+          <small>Produkte im aktuellen Bestand</small>
+        </article>
+        <article class="metric-card">
+          <div class="metric-top"><span>Lagerwert (EK)</span><b class="metric-icon">€</b></div>
+          <strong id="dValue">0,00 €</strong>
+          <small>Wert des gezählten Bestands</small>
+        </article>
+        <article class="metric-card">
+          <div class="metric-top"><span>Inventurfortschritt</span><b class="metric-icon">◔</b></div>
+          <strong id="dPercent">0 %</strong>
+          <div class="progress"><i id="progressBar"></i></div>
+          <small id="dProgressText">0 von 0 Artikeln</small>
+        </article>
+        <article class="metric-card alert-card">
+          <div class="metric-top"><span>Abweichungen</span><b class="metric-icon alert">!</b></div>
+          <strong id="dDiffs">0</strong>
+          <small>Artikel mit Soll-/Ist-Differenz</small>
+        </article>
       </div>
 
       <div class="dashboard-grid">
-        <article class="panel">
-          <div class="panel-head"><div><h2>Fortschritt</h2><p>Aktuelle Inventur</p></div><span id="progressLabel">0 %</span></div>
-          <div class="progress"><i id="dashProgress"></i></div>
-          <div id="dashRecent" class="list empty">Noch nichts erfasst.</div>
-        </article>
-        <article class="panel">
-          <div class="panel-head"><div><h2>Schnellzugriff</h2><p>Die wichtigsten Aktionen</p></div></div>
-          <div class="quick-grid">
-            <button class="quick-action" data-go="inventory">▣<span>Scannen</span></button>
-            <button class="quick-action" id="demoBtn">✦<span>Demo laden</span></button>
-            <button class="quick-action" data-go="articles">⌕<span>Artikel suchen</span></button>
-            <button class="quick-action" data-go="stats">↗<span>Auswertung</span></button>
+        <article class="panel active-inventory">
+          <div class="panel-head">
+            <div><span class="kicker">AKTIVE INVENTUR</span><h3>Aktuelle Zählung</h3></div>
+            <span class="status-badge" id="activeState">Bereit</span>
+          </div>
+          <div class="active-body">
+            <div>
+              <h4 id="activeTitle">Inventur aktuell</h4>
+              <p>Automatisch lokal gespeichert</p>
+              <button class="btn gold-btn" data-go="inventory">Fortsetzen</button>
+            </div>
+            <div class="ring" id="progressRing"><span id="ringValue">0%</span></div>
           </div>
         </article>
+
+        <article class="panel">
+          <div class="panel-head"><div><span class="kicker">LAGERORTE</span><h3>Fortschritt nach Bereich</h3></div></div>
+          <div id="locationOverview" class="location-overview empty">Noch keine Zählung vorhanden.</div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-head"><div><span class="kicker">LETZTE AKTIONEN</span><h3>Zuletzt erfasst</h3></div></div>
+          <div id="recentOverview" class="activity-list empty">Noch nichts erfasst.</div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-head"><div><span class="kicker">BESTAND</span><h3>Handlungsbedarf</h3></div></div>
+          <div class="needs-grid">
+            <div><strong id="belowMin">0</strong><span>unter Mindestbestand</span></div>
+            <div><strong id="openCount">0</strong><span>noch nicht gezählt</span></div>
+          </div>
+          <button class="btn dark-btn full" data-go="articles">Artikel ansehen</button>
+        </article>
+      </div>
+
+      <div class="quick-bar">
+        <button data-go="inventory"><b>▣</b><span>Inventur</span></button>
+        <button id="demoBtn"><b>✦</b><span>Demo laden</span></button>
+        <button data-go="articles"><b>⌕</b><span>Artikel</span></button>
+        <button data-go="stats"><b>▥</b><span>Auswertung</span></button>
       </div>
     </section>
 
-    <section id="page-inventory" class="page">
-      <div class="page-title"><div><span class="eyebrow">INVENTURMODUS</span><h1>Scannen & zählen</h1></div><button class="btn ghost" id="saveBtn">Speichern</button></div>
+    <section class="page" id="page-inventory">
+      <div class="content-card">
+        <div class="section-head">
+          <div><span class="kicker gold">INVENTUR</span><h2>Scannen & zählen</h2><p>Dieser Bereich bleibt aus V4 erhalten. Der Scanner-Popup-Umbau kommt als nächster Schritt.</p></div>
+          <label class="btn gold-btn" for="inventoryImport">Bestand importieren</label>
+          <input id="inventoryImport" type="file" accept=".csv,.xlsx,.xls" hidden>
+        </div>
 
-      <div class="inventory-layout">
-        <div class="panel scan-panel">
-          <div class="field-grid">
-            <label><span>Lagerort</span><select id="locationSelect"></select></label>
-            <label><span>Neuer Lagerort</span><div class="inline"><input id="newLocation" placeholder="z. B. Keller"><button id="addLocationBtn" class="square-btn">+</button></div></label>
-          </div>
-
-          <div id="scannerIdle" class="scanner-idle">
-            <div class="scan-symbol">▣</div>
-            <h2>Bereit zum Scannen</h2>
-            <p>Nutze die Tablet-Kamera oder suche einen Artikel manuell.</p>
-            <button class="btn primary" id="scanBtn">Kamera starten</button>
-          </div>
-          <div id="scannerLive" class="scanner-live hidden">
-            <div id="reader"></div>
-            <button class="btn ghost" id="stopScanBtn">Scanner schließen</button>
-          </div>
-
-          <div class="search-row">
-            <input id="searchInput" placeholder="Barcode oder Artikelname">
-            <button id="findBtn" class="btn secondary">Auswählen</button>
-          </div>
-
-          <div id="countCard" class="count-card hidden">
-            <div class="count-head">
-              <div><span class="eyebrow">GEFUNDEN</span><h2 id="countName">Artikel</h2><p id="countMeta"></p></div>
-              <span id="countStatus" class="status open">Offen</span>
+        <div class="two-col">
+          <div>
+            <label class="field"><span>Lagerort</span><select id="locationSelect"></select></label>
+            <div class="inline-field">
+              <input id="newLocation" placeholder="Neuer Lagerort">
+              <button class="square" id="addLocation">+</button>
             </div>
-            <div class="counter">
-              <button id="minusBtn">−</button>
-              <input id="qtyInput" type="number" min="0" step="1" value="1" inputmode="numeric">
-              <button id="plusBtn">+</button>
+          </div>
+          <div class="scan-box">
+            <div id="scannerIdle">
+              <div class="scan-glyph">▣</div>
+              <h3>Barcode Scanner</h3>
+              <p>Kamera starten oder Barcode manuell suchen.</p>
+              <button class="btn gold-btn" id="startScanner">Kamera starten</button>
             </div>
-            <button id="countSaveBtn" class="btn primary full">Menge speichern & weiter</button>
+            <div id="scannerLive" class="hidden"><div id="reader"></div><button class="btn dark-btn" id="stopScanner">Scanner schließen</button></div>
           </div>
         </div>
 
-        <aside class="panel side-status">
-          <h2>Status</h2>
-          <div class="mini-metrics">
-            <div><strong id="iTotal">0</strong><span>Artikel</span></div>
-            <div><strong id="iCounted">0</strong><span>Erfasst</span></div>
-            <div><strong id="iMatch">0</strong><span>Passt</span></div>
-            <div><strong id="iDiff">0</strong><span>Abweichend</span></div>
+        <div class="search-line">
+          <input id="searchInput" placeholder="Barcode oder Artikelname">
+          <button class="btn dark-btn" id="findProduct">Artikel auswählen</button>
+        </div>
+
+        <div id="countPanel" class="count-panel hidden">
+          <div><span class="kicker gold">GEFUNDEN</span><h3 id="countName"></h3><p id="countMeta"></p></div>
+          <div class="counter">
+            <button id="minus">−</button><input id="qty" type="number" min="0" value="1"><button id="plus">+</button>
           </div>
-          <h3>Zuletzt erfasst</h3>
-          <div id="recentList" class="list empty">Noch nichts erfasst.</div>
-        </aside>
+          <button class="btn gold-btn full" id="saveCount">Menge speichern & weiter</button>
+        </div>
       </div>
 
-      <article class="panel table-panel">
-        <div class="panel-head">
-          <div><h2>Soll / Ist</h2><p>Alle Lagerorte zusammen</p></div>
-          <div class="actions"><button class="btn ghost" id="diffFilterBtn">Nur Abweichungen</button><button class="btn primary" id="finishBtn">Inventur abschließen</button></div>
-        </div>
-        <div class="table-scroll">
-          <table><thead><tr><th>Artikel</th><th>Barcode</th><th>Soll</th><th>Ist</th><th>Diff.</th><th>Lagerorte</th><th>Status</th></tr></thead><tbody id="inventoryBody"></tbody></table>
-        </div>
-      </article>
+      <div class="content-card">
+        <div class="section-head"><div><span class="kicker">SOLL / IST</span><h2>Inventurstatus</h2></div><button class="btn dark-btn" id="finishInventory">Inventur abschließen</button></div>
+        <div class="card-list" id="inventoryCards"></div>
+      </div>
     </section>
 
-    <section id="page-articles" class="page">
-      <div class="page-title"><div><span class="eyebrow">ARTIKEL</span><h1>Bestandsübersicht</h1></div><button class="btn primary" id="newProductBtn">+ Artikel anlegen</button></div>
-      <article class="panel">
-        <div class="toolbar">
-          <input id="articleSearch" placeholder="Artikel oder Barcode suchen…">
-          <button class="btn ghost" id="exportBtn">CSV exportieren</button>
-        </div>
-        <div class="table-scroll"><table><thead><tr><th>Artikel</th><th>Barcode</th><th>Soll</th><th>Ist</th><th>EK</th><th>VK</th><th>Min.</th><th>Bestellung</th></tr></thead><tbody id="articleBody"></tbody></table></div>
-      </article>
+    <section class="page" id="page-articles">
+      <div class="content-card">
+        <div class="section-head"><div><span class="kicker gold">ARTIKEL</span><h2>Lagerbestand</h2></div><button class="btn dark-btn" id="exportCsv">CSV exportieren</button></div>
+        <input id="articleSearch" class="wide-search" placeholder="Artikel oder Barcode suchen">
+        <div class="card-list" id="articleCards"></div>
+      </div>
     </section>
 
-    <section id="page-stats" class="page">
-      <div class="page-title"><div><span class="eyebrow">AUSWERTUNG</span><h1>Zahlen auf einen Blick</h1></div></div>
-      <div class="metrics">
-        <article class="metric"><span>Soll-Lagerwert</span><strong id="sExpected">0,00 €</strong><small>EK</small></article>
-        <article class="metric"><span>Gezählt</span><strong id="sCounted">0,00 €</strong><small>EK</small></article>
-        <article class="metric"><span>VK-Wert</span><strong id="sRetail">0,00 €</strong><small>gezählter Bestand</small></article>
-        <article class="metric"><span>Potenzielle Marge</span><strong id="sMargin">0,00 €</strong><small>VK − EK</small></article>
+    <section class="page" id="page-locations">
+      <div class="content-card"><span class="kicker gold">LAGERORTE</span><h2>Bereiche & Bestände</h2><div id="locationPage" class="location-page"></div></div>
+    </section>
+
+    <section class="page" id="page-stats">
+      <div class="metric-grid">
+        <article class="metric-card"><span>Soll-Lagerwert</span><strong id="sExpected">0,00 €</strong><small>EK</small></article>
+        <article class="metric-card"><span>Gezählter Lagerwert</span><strong id="sCounted">0,00 €</strong><small>EK</small></article>
+        <article class="metric-card"><span>VK-Wert</span><strong id="sRetail">0,00 €</strong><small>gezählt</small></article>
+        <article class="metric-card"><span>Potenzielle Marge</span><strong id="sMargin">0,00 €</strong><small>VK − EK</small></article>
       </div>
       <div class="dashboard-grid">
-        <article class="panel"><div class="panel-head"><div><h2>Lagerorte</h2><p>Gezählte Stück & EK-Wert</p></div></div><div id="locationStats" class="list empty">Noch keine Daten.</div></article>
-        <article class="panel"><div class="panel-head"><div><h2>Bestellvorschläge</h2><p>Unter Mindestbestand</p></div></div><div id="orderSuggestions" class="list empty">Keine Vorschläge.</div></article>
+        <article class="panel"><span class="kicker gold">BESTELLUNG</span><h3>Bestellvorschläge</h3><div id="orders"></div></article>
+        <article class="panel"><span class="kicker gold">LAGERORTE</span><h3>Gezählte Werte</h3><div id="locationStats"></div></article>
       </div>
     </section>
 
-    <section id="page-history" class="page">
-      <div class="page-title"><div><span class="eyebrow">HISTORIE</span><h1>Abgeschlossene Inventuren</h1></div></div>
-      <article class="panel"><div id="historyList" class="list empty">Noch keine abgeschlossene Inventur.</div></article>
+    <section class="page" id="page-history">
+      <div class="content-card"><span class="kicker gold">HISTORIE</span><h2>Abgeschlossene Inventuren</h2><div id="history"></div></div>
     </section>
 
-    <section id="page-settings" class="page">
-      <div class="page-title"><div><span class="eyebrow">EINSTELLUNGEN</span><h1>App anpassen</h1></div></div>
-      <div class="settings-grid">
-        <article class="panel">
-          <h2>Scan-Verhalten</h2>
-          <label class="check"><input type="checkbox" id="vibrationToggle" checked><span>Vibration nach erfolgreichem Scan</span></label>
-          <label class="check"><input type="checkbox" id="beepToggle" checked><span>Signalton nach erfolgreichem Scan</span></label>
-        </article>
-        <article class="panel">
-          <h2>Daten</h2>
-          <p class="muted">Die aktuelle Version speichert alles lokal auf diesem Gerät. Es werden keine Daten an einen Server übertragen.</p>
-          <div class="actions"><button class="btn ghost" id="backupBtn">Backup exportieren</button><label class="btn ghost" for="backupImport">Backup importieren</label><input id="backupImport" type="file" accept=".json" hidden></div>
-        </article>
-        <article class="panel danger-zone">
-          <h2>Zurücksetzen</h2>
-          <p class="muted">Löscht die laufende Inventur auf diesem Gerät. Die Historie bleibt erhalten.</p>
-          <button class="btn danger" id="resetBtn">Laufende Inventur löschen</button>
-        </article>
+    <section class="page" id="page-settings">
+      <div class="dashboard-grid">
+        <article class="panel"><span class="kicker gold">DARSTELLUNG</span><h3>DJ Innovations Theme</h3><p>Schwarz-Gold ist als Hauptdesign aktiv. Über den Button oben rechts kannst du eine hellere Ansicht testen.</p></article>
+        <article class="panel"><span class="kicker gold">DATEN</span><h3>Lokale Speicherung</h3><p>Die Testversion speichert die laufende Inventur lokal auf diesem Gerät.</p><button class="btn danger-btn" id="resetData">Laufende Inventur löschen</button></article>
       </div>
     </section>
   </main>
 </div>
 
-<dialog id="productDialog">
-  <div class="dialog-body">
-    <div class="dialog-head"><div><span class="eyebrow">NEUER ARTIKEL</span><h2>Produkt anlegen</h2></div><button id="closeDialog" class="icon-btn">×</button></div>
-    <div class="field-grid">
-      <label><span>Artikelname</span><input id="npName"></label>
-      <label><span>Barcode</span><input id="npBarcode" inputmode="numeric"></label>
-      <label><span>Soll-Bestand</span><input id="npStock" type="number" min="0"></label>
-      <label><span>Jetzt gezählt</span><input id="npQty" type="number" min="0" value="1"></label>
-      <label><span>Einkaufspreis €</span><input id="npBuy" type="number" min="0" step="0.01"></label>
-      <label><span>Verkaufspreis €</span><input id="npSell" type="number" min="0" step="0.01"></label>
-      <label><span>Mindestbestand</span><input id="npMin" type="number" min="0"></label>
-    </div>
-    <button id="saveProductBtn" class="btn primary full">Artikel speichern</button>
-  </div>
-</dialog>
-
-<div id="toast" class="toast hidden" aria-live="polite"></div>
-
+<div id="toast" class="toast hidden"></div>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://unpkg.com/html5-qrcode"></script>
 <script src="./app.js"></script>

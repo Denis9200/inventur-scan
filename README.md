@@ -1,23 +1,17 @@
-# Inventur Scan V4
+# Inventur Scan V5 – Schritt 1
 
-PWA-Prototyp für mobile Inventuren.
+Dashboard-Redesign im DJ-Innovations-Branding.
 
 ## GitHub Pages
-Alle Dateien aus diesem Ordner in den Root des Repository `Inventur-scan` hochladen.
-GitHub Pages muss auf `main` / `(root)` zeigen.
+Den Inhalt dieses Ordners in den Root des bestehenden GitHub-Repositories hochladen und vorhandene App-Dateien ersetzen.
 
-## Funktionen
-- Dashboard
-- CSV-/Excel-Import
-- Barcode-Scanner
-- mehrere Lagerorte
-- Soll/Ist/Differenz
-- Artikelverwaltung
-- EK/VK/Mindestbestand
-- Auswertung & Bestellvorschläge
-- Historie
-- Dark Mode
-- lokales Backup
+Enthalten:
+- Dashboard im Schwarz-Gold-Look
+- echtes DJ-Innovations-Logo
+- aktive Inventur / Fortschritt
+- Lagerwert / Abweichungen / Mindestbestand
+- Lagerorte / letzte Aktivitäten / Schnellzugriff
+- vorhandene Inventur-, Artikel- und Auswertungsfunktionen
 - PWA / Offline-Grundgerüst
 
-Hinweis: Für Kamera und PWA ist HTTPS erforderlich.
+Nächster Schritt: Scanner als Vollbild-Popup + Produkt-Popup.

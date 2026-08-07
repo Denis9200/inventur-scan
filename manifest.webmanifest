@@ -1,12 +1,12 @@
 {
-  "name": "Inventur Scan",
-  "short_name": "Inventur",
-  "description": "Mobile Inventur mit Barcode-Scan, Lagerorten und Soll/Ist-Abgleich.",
+  "name": "Inventur Scan – DJ Innovations",
+  "short_name": "Inventur Scan",
+  "description": "Lagerbestand und mobile Inventur.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#f6f8fb",
-  "theme_color": "#0f172a",
+  "background_color": "#060606",
+  "theme_color": "#080808",
   "orientation": "any",
   "icons": [
     {
