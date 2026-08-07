@@ -1,7 +1,7 @@
 
 const $=id=>document.getElementById(id);
 const KEY='dj_inventur_v5_step1', HIST='dj_inventur_history_v5';
-let products=[],locations=['Salon','Keller'],recent=[],current=null,scanner=null,articleScanner=null,fullScanner=null,lastScan='',theme='dark',activeLocationDetail=null,scanProduct=null,scanRestartAfterSave=false,fullFacing='environment';
+let products=[],locations=['Salon','Keller'],recent=[],current=null,scanner=null,articleScanner=null,fullScanner=null,lastScan='',theme='dark',activeLocationDetail=null,scanProduct=null,scanRestartAfterSave=false,fullFacing='environment',editProduct=null;
 
 const num=v=>{const x=Number(String(v??'').replace(',','.'));return Number.isFinite(x)?x:0};
 const tx=v=>String(v??'').trim();
@@ -32,6 +32,79 @@ function renderLocations(){
  if(locations.includes(cur))s.value=cur;
  const ss=$('scanLocation'); if(ss){const cur2=ss.value;ss.innerHTML=locations.map(l=>`<option>${esc(l)}</option>`).join(''); if(locations.includes(cur2))ss.value=cur2; else if(locations.includes(s.value))ss.value=s.value}
 }
+
+function attachEditHandlers(){
+ document.querySelectorAll('[data-edit-product]').forEach(el=>{
+   el.addEventListener('click',e=>{
+     if(e.target.closest('button,input,select'))return;
+     const p=products.find(x=>String(x.id)===String(el.dataset.editProduct));
+     if(p)openEditProduct(p);
+   });
+ });
+}
+
+function openEditProduct(p){
+ editProduct=p;
+ $('epTitle').textContent=p.name;
+ $('epName').value=p.name;
+ $('epBarcode').value=p.barcode||'';
+ $('epExpected').value=p.expected||0;
+ $('epMin').value=p.min||0;
+ $('epBuy').value=p.buy||0;
+ $('epSell').value=p.sell||0;
+
+ $('epLocations').innerHTML=locations.map(loc=>`
+   <label class="edit-location-row">
+     <strong>${esc(loc)}</strong>
+     <input type="number" min="0" step="1" value="${num((p.counts||{})[loc])}" data-ep-location="${esc(loc)}">
+   </label>
+ `).join('');
+ updateEditSummary();
+ $('epLocations').querySelectorAll('input[data-ep-location]').forEach(i=>i.addEventListener('input',updateEditSummary));
+ ['epExpected','epBuy'].forEach(id=>$(id).addEventListener('input',updateEditSummary,{once:true}));
+ $('editProductDialog').showModal();
+}
+
+function updateEditSummary(){
+ if(!editProduct)return;
+ const counts={};
+ $('epLocations').querySelectorAll('input[data-ep-location]').forEach(i=>counts[i.dataset.epLocation]=Math.max(0,num(i.value)));
+ const t=Object.values(counts).reduce((a,b)=>a+b,0),
+       expected=Math.max(0,num($('epExpected').value)),
+       d=t-expected,
+       buy=Math.max(0,num($('epBuy').value));
+ $('epTotal').textContent=t;
+ $('epDiff').textContent=(d>0?'+':'')+d;
+ $('epDiff').className=d===0?'diff-good':'diff-bad';
+ $('epValue').textContent=euro(t*buy);
+}
+
+function saveEditProduct(){
+ if(!editProduct)return;
+ const name=tx($('epName').value);
+ if(!name){toast('Artikelname darf nicht leer sein');return}
+ editProduct.name=name;
+ editProduct.barcode=tx($('epBarcode').value);
+ editProduct.expected=Math.max(0,num($('epExpected').value));
+ editProduct.min=Math.max(0,num($('epMin').value));
+ editProduct.buy=Math.max(0,num($('epBuy').value));
+ editProduct.sell=Math.max(0,num($('epSell').value));
+ editProduct.counts=editProduct.counts||{};
+ locations.forEach(loc=>editProduct.counts[loc]=0);
+ $('epLocations').querySelectorAll('input[data-ep-location]').forEach(i=>editProduct.counts[i.dataset.epLocation]=Math.max(0,num(i.value)));
+ $('editProductDialog').close();
+ editProduct=null;
+ save();render();toast('Artikel aktualisiert');
+}
+
+function deleteEditProduct(){
+ if(!editProduct)return;
+ if(!confirm(`Artikel "${editProduct.name}" wirklich löschen?`))return;
+ products=products.filter(p=>String(p.id)!==String(editProduct.id));
+ $('editProductDialog').close();
+ editProduct=null;
+ save();render();toast('Artikel gelöscht');
+}
 function render(){
  renderLocations();
  const counted=products.filter(p=>total(p)>0).length,diffs=products.filter(p=>total(p)>0&&diff(p)!==0).length,pct=products.length?Math.round(counted/products.length*100):0,value=products.reduce((a,p)=>a+total(p)*p.buy,0),below=products.filter(p=>p.min&&total(p)<p.min).length;
@@ -40,9 +113,9 @@ function render(){
  $('recentOverview').classList.toggle('empty',!recent.length);
  $('locationOverview').innerHTML=locations.map(loc=>{const countedLoc=products.filter(p=>num((p.counts||{})[loc])>0).length,p=products.length?Math.round(countedLoc/products.length*100):0;return `<div class="location-row"><div class="location-title"><span>${esc(loc)}</span><span>${p}%</span></div><div class="mini-progress"><i style="width:${p}%"></i></div></div>`}).join('')||'Keine Lagerorte.';
  $('inventoryCards').innerHTML=products.length?products.map(p=>productCard(p,true)).join(''):'<p style="color:#777">Noch keine Daten geladen.</p>';
- renderArticles();renderStats();renderLocationsPage();renderHistory()
+ renderArticles();renderStats();renderLocationsPage();renderHistory();attachEditHandlers()
 }
-function productCard(p,inventory=false){const c=total(p),d=diff(p),cl=c===0?'':d===0?'diff-good':'diff-bad';return `<article class="product-card"><h4>${esc(p.name)}</h4><div class="meta">${esc(p.barcode||'ohne Barcode')}</div><div class="numbers"><div><small>Soll</small><strong>${p.expected}</strong></div><div><small>Ist</small><strong>${c}</strong></div><div><small>Diff.</small><strong class="${cl}">${c?(d>0?'+':'')+d:'–'}</strong></div></div></article>`}
+function productCard(p,inventory=false){const c=total(p),d=diff(p),cl=c===0?'':d===0?'diff-good':'diff-bad';return `<article class="product-card" data-edit-product="${esc(p.id)}"><h4>${esc(p.name)}</h4><div class="meta">${esc(p.barcode||'ohne Barcode')}</div><div class="numbers"><div><small>Soll</small><strong>${p.expected}</strong></div><div><small>Ist</small><strong>${c}</strong></div><div><small>Diff.</small><strong class="${cl}">${c?(d>0?'+':'')+d:'–'}</strong></div></div></article>`}
 
 function renderSuggestions(){
  const box=$('searchSuggestions'),q=tx($('articleSearch').value).toLowerCase();
@@ -80,8 +153,8 @@ async function stopArticleScanner(){
  try{if(articleScanner){await articleScanner.stop();await articleScanner.clear();articleScanner=null}}catch(e){}
  $('articleScannerModal').classList.add('hidden');
 }
-function renderArticles(){const q=tx($('articleSearch').value).toLowerCase(),list=products.filter(p=>!q||p.name.toLowerCase().includes(q)||(p.barcode||'').includes(q));$('articleCards').innerHTML=list.length?list.map(p=>{const c=total(p),order=Math.max(0,(p.min||0)-c);return `<article class="product-card" data-product-id="${esc(p.id)}"><h4>${esc(p.name)}</h4><div class="meta">${esc(p.barcode||'–')}</div><div class="numbers"><div><small>Ist</small><strong>${c}</strong></div><div><small>EK</small><strong>${p.buy?euro(p.buy):'–'}</strong></div><div><small>Nachbest.</small><strong class="${order?'diff-bad':'diff-good'}">${order||'OK'}</strong></div></div></article>`}).join(''):'<p style="color:#777">Keine Artikel.</p>'}
-function renderStats(){let ev=0,cv=0,rv=0;products.forEach(p=>{ev+=p.expected*p.buy;cv+=total(p)*p.buy;rv+=total(p)*p.sell});$('sExpected').textContent=euro(ev);$('sCounted').textContent=euro(cv);$('sRetail').textContent=euro(rv);$('sMargin').textContent=euro(rv-cv);const orders=products.map(p=>({p,n:Math.max(0,(p.min||0)-total(p))})).filter(x=>x.n>0);$('orders').innerHTML=orders.length?orders.map(x=>`<div class="order-row"><span>${esc(x.p.name)}</span><b class="diff-bad">${x.n} Stk.</b></div>`).join(''):'<p style="color:#777">Keine Bestellvorschläge.</p>';$('locationStats').innerHTML=locations.map(l=>{const pcs=products.reduce((a,p)=>a+num((p.counts||{})[l]),0),v=products.reduce((a,p)=>a+num((p.counts||{})[l])*p.buy,0);return `<div class="order-row"><span>${esc(l)}</span><b>${pcs} Stk. · ${euro(v)}</b></div>`}).join('')}
+function renderArticles(){const q=tx($('articleSearch').value).toLowerCase(),list=products.filter(p=>!q||p.name.toLowerCase().includes(q)||(p.barcode||'').includes(q));$('articleCards').innerHTML=list.length?list.map(p=>{const c=total(p),order=Math.max(0,(p.min||0)-c);return `<article class="product-card" data-product-id="${esc(p.id)}" data-edit-product="${esc(p.id)}"><h4>${esc(p.name)}</h4><div class="meta">${esc(p.barcode||'–')}</div><div class="numbers"><div><small>Ist</small><strong>${c}</strong></div><div><small>EK</small><strong>${p.buy?euro(p.buy):'–'}</strong></div><div><small>Nachbest.</small><strong class="${order?'diff-bad':'diff-good'}">${order||'OK'}</strong></div></div></article>`}).join(''):'<p style="color:#777">Keine Artikel.</p>';attachEditHandlers()}
+function renderStats(){let ev=0,cv=0,rv=0;products.forEach(p=>{ev+=p.expected*p.buy;cv+=total(p)*p.buy;rv+=total(p)*p.sell});$('sExpected').textContent=euro(ev);$('sCounted').textContent=euro(cv);$('sRetail').textContent=euro(rv);$('sMargin').textContent=euro(rv-cv);const orders=products.map(p=>({p,n:Math.max(0,(p.min||0)-total(p))})).filter(x=>x.n>0);$('orders').innerHTML=orders.length?orders.map(x=>`<div class="order-row clickable" data-edit-product="${esc(x.p.id)}"><span>${esc(x.p.name)}</span><b class="diff-bad">${x.n} Stk.</b></div>`).join(''):'<p style="color:#777">Keine Bestellvorschläge.</p>';$('locationStats').innerHTML=locations.map(l=>{const pcs=products.reduce((a,p)=>a+num((p.counts||{})[l]),0),v=products.reduce((a,p)=>a+num((p.counts||{})[l])*p.buy,0);return `<div class="order-row"><span>${esc(l)}</span><b>${pcs} Stk. · ${euro(v)}</b></div>`}).join('')}
 function renderLocationsPage(){
  $('locationPage').innerHTML=locations.map(l=>{
    const pcs=products.reduce((a,p)=>a+num((p.counts||{})[l]),0),
@@ -111,13 +184,14 @@ function showLocationDetail(loc,scroll=true){
  $('locationDetailMeta').textContent=`${rows.length} verschiedene Artikel · ${pieces} Stück · ${euro(value)} EK-Wert`;
  $('locationProducts').innerHTML=rows.length?rows.map(p=>{
    const locCount=num((p.counts||{})[loc]), totalAll=total(p);
-   return `<article class="location-product">
+   return `<article class="location-product" data-edit-product="${esc(p.id)}">
       <h4>${esc(p.name)}</h4>
       <div class="lp-meta">Barcode: ${esc(p.barcode||'–')}</div>
       <div class="lp-count"><div><span>in ${esc(loc)}</span><strong>${locCount}</strong></div><div style="text-align:right"><span>gesamt gezählt</span><strong style="color:#ddd">${totalAll}</strong></div></div>
    </article>`
  }).join(''):'<p style="color:#777">In diesem Lagerort wurde noch kein Produkt gezählt.</p>';
  $('locationDetail').classList.remove('hidden');
+ attachEditHandlers();
  if(scroll) $('locationDetail').scrollIntoView({behavior:'smooth',block:'start'});
 }
 function renderHistory(){let h=[];try{h=JSON.parse(localStorage.getItem(HIST)||'[]')}catch(e){};$('history').innerHTML=h.length?h.map(x=>`<div class="order-row"><div><strong>${esc(x.title)}</strong><small style="display:block;color:#777">${esc(x.date)}</small></div><b>${x.counted}/${x.total}</b></div>`).join(''):'<p style="color:#777">Noch keine abgeschlossene Inventur.</p>'}
@@ -221,6 +295,19 @@ $('scanPlus').addEventListener('click',()=>$('scanQty').value=num($('scanQty').v
 $('scanMinus').addEventListener('click',()=>$('scanQty').value=Math.max(0,num($('scanQty').value)-1));
 $('scanSaveContinue').addEventListener('click',()=>saveScanProduct(true));
 $('scanSaveStop').addEventListener('click',()=>saveScanProduct(false));
+$('scanEditProduct').addEventListener('click',()=>{
+ if(!scanProduct)return;
+ const p=scanProduct;
+ $('scanProductDialog').close();
+ scanProduct=null;
+ openEditProduct(p);
+});
+$('epClose').addEventListener('click',()=>{$('editProductDialog').close();editProduct=null});
+$('epCancel').addEventListener('click',()=>{$('editProductDialog').close();editProduct=null});
+$('epSave').addEventListener('click',saveEditProduct);
+$('epDelete').addEventListener('click',deleteEditProduct);
+$('epExpected').addEventListener('input',updateEditSummary);
+$('epBuy').addEventListener('input',updateEditSummary);
 document.addEventListener('click',e=>{if(!e.target.closest('.article-search-wrap'))$('searchSuggestions').classList.add('hidden')});
 
 if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js').catch(()=>{}));

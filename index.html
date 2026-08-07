@@ -309,7 +309,72 @@
     </div>
 
     <button class="btn gold-btn full" id="scanSaveContinue">Speichern & weiter</button>
+    <button class="btn dark-btn full" id="scanEditProduct">Artikel bearbeiten</button>
     <button class="btn dark-btn full" id="scanSaveStop">Speichern & Scanner beenden</button>
+  </div>
+</dialog>
+
+
+<dialog id="editProductDialog" class="edit-product-dialog">
+  <div class="edit-product-body">
+    <div class="dialog-head">
+      <div>
+        <span class="kicker gold">ARTIKEL BEARBEITEN</span>
+        <h2 id="epTitle">Artikel</h2>
+      </div>
+      <button class="round-btn" id="epClose">×</button>
+    </div>
+
+    <div class="edit-grid">
+      <label class="field">
+        <span>Artikelname</span>
+        <input id="epName">
+      </label>
+      <label class="field">
+        <span>Barcode</span>
+        <input id="epBarcode" inputmode="numeric">
+      </label>
+      <label class="field">
+        <span>Sollbestand</span>
+        <input id="epExpected" type="number" min="0">
+      </label>
+      <label class="field">
+        <span>Mindestbestand</span>
+        <input id="epMin" type="number" min="0">
+      </label>
+      <label class="field">
+        <span>Einkaufspreis €</span>
+        <input id="epBuy" type="number" min="0" step="0.01">
+      </label>
+      <label class="field">
+        <span>Verkaufspreis €</span>
+        <input id="epSell" type="number" min="0" step="0.01">
+      </label>
+    </div>
+
+    <div class="edit-section">
+      <div class="section-head">
+        <div>
+          <span class="kicker gold">LAGERORTE</span>
+          <h3>Mengen pro Lagerort</h3>
+        </div>
+      </div>
+      <div id="epLocations" class="edit-locations"></div>
+    </div>
+
+    <div class="edit-summary">
+      <div><span>Gesamt gezählt</span><strong id="epTotal">0</strong></div>
+      <div><span>Differenz</span><strong id="epDiff">0</strong></div>
+      <div><span>Lagerwert EK</span><strong id="epValue">0,00 €</strong></div>
+    </div>
+
+    <div class="edit-actions">
+      <button class="btn danger-btn" id="epDelete">Artikel löschen</button>
+      <div>
+        <button class="btn dark-btn" id="epCancel">Abbrechen</button>
+        <button class="btn gold-btn" id="epSave">Änderungen speichern</button>
+      </div>
+    </div>
   </div>
 </dialog>
 
