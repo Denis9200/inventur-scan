@@ -1,17 +1,13 @@
-# Inventur Scan V5 – Schritt 1
+# Inventur Scan V5 – Schritt 1.1
 
-Dashboard-Redesign im DJ-Innovations-Branding.
+Erweiterung des DJ-Innovations-Dashboards.
 
-## GitHub Pages
-Den Inhalt dieses Ordners in den Root des bestehenden GitHub-Repositories hochladen und vorhandene App-Dateien ersetzen.
+Neu:
+- Lagerorte anklickbar
+- Detailansicht pro Lagerort mit allen dort gezählten Produkten
+- Stückzahl und EK-Wert pro Lagerort
+- Live-Artikelsuche mit Vorschlägen schon während der Eingabe
+- Barcode-Scanner direkt in der Artikelsuche
+- passender Artikel wird nach Scan automatisch gefiltert/angezeigt
 
-Enthalten:
-- Dashboard im Schwarz-Gold-Look
-- echtes DJ-Innovations-Logo
-- aktive Inventur / Fortschritt
-- Lagerwert / Abweichungen / Mindestbestand
-- Lagerorte / letzte Aktivitäten / Schnellzugriff
-- vorhandene Inventur-, Artikel- und Auswertungsfunktionen
-- PWA / Offline-Grundgerüst
-
-Nächster Schritt: Scanner als Vollbild-Popup + Produkt-Popup.
+GitHub: Inhalt der ZIP in den Root des bestehenden Repository hochladen und alte Dateien ersetzen.

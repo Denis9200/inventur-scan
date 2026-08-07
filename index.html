@@ -179,14 +179,53 @@
 
     <section class="page" id="page-articles">
       <div class="content-card">
-        <div class="section-head"><div><span class="kicker gold">ARTIKEL</span><h2>Lagerbestand</h2></div><button class="btn dark-btn" id="exportCsv">CSV exportieren</button></div>
-        <input id="articleSearch" class="wide-search" placeholder="Artikel oder Barcode suchen">
+        <div class="section-head">
+          <div><span class="kicker gold">ARTIKEL</span><h2>Lagerbestand</h2></div>
+          <button class="btn dark-btn" id="exportCsv">CSV exportieren</button>
+        </div>
+
+        <div class="article-search-wrap">
+          <div class="article-search-line">
+            <input id="articleSearch" class="wide-search" placeholder="Artikelname oder Barcode eingeben …" autocomplete="off">
+            <button class="btn gold-btn" id="articleScanBtn">▣ Barcode scannen</button>
+          </div>
+          <div id="searchSuggestions" class="suggestions hidden"></div>
+        </div>
+
+        <div id="articleScannerModal" class="scan-modal hidden">
+          <div class="scan-modal-card">
+            <div class="scan-modal-head">
+              <div><span class="kicker gold">ARTIKELSUCHE</span><h3>Barcode scannen</h3></div>
+              <button class="round-btn" id="articleScanClose">×</button>
+            </div>
+            <div id="articleReader"></div>
+            <p>Barcode in den Rahmen halten. Der passende Artikel wird automatisch geöffnet.</p>
+          </div>
+        </div>
+
         <div class="card-list" id="articleCards"></div>
       </div>
     </section>
 
     <section class="page" id="page-locations">
-      <div class="content-card"><span class="kicker gold">LAGERORTE</span><h2>Bereiche & Bestände</h2><div id="locationPage" class="location-page"></div></div>
+      <div class="content-card">
+        <span class="kicker gold">LAGERORTE</span>
+        <h2>Bereiche & Bestände</h2>
+        <p>Tippe auf einen Lagerort, um alle dort gezählten Produkte zu sehen.</p>
+        <div id="locationPage" class="location-page"></div>
+
+        <div id="locationDetail" class="location-detail hidden">
+          <div class="location-detail-head">
+            <div>
+              <span class="kicker gold">LAGERORT</span>
+              <h2 id="locationDetailTitle">Salon</h2>
+              <p id="locationDetailMeta"></p>
+            </div>
+            <button class="btn dark-btn" id="closeLocationDetail">Übersicht</button>
+          </div>
+          <div id="locationProducts" class="location-products"></div>
+        </div>
+      </div>
     </section>
 
     <section class="page" id="page-stats">

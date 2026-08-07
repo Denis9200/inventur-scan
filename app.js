@@ -1,7 +1,7 @@
 
 const $=id=>document.getElementById(id);
 const KEY='dj_inventur_v5_step1', HIST='dj_inventur_history_v5';
-let products=[],locations=['Salon','Keller'],recent=[],current=null,scanner=null,lastScan='',theme='dark';
+let products=[],locations=['Salon','Keller'],recent=[],current=null,scanner=null,articleScanner=null,lastScan='',theme='dark',activeLocationDetail=null;
 
 const num=v=>{const x=Number(String(v??'').replace(',','.'));return Number.isFinite(x)?x:0};
 const tx=v=>String(v??'').trim();
@@ -38,9 +38,83 @@ function render(){
  renderArticles();renderStats();renderLocationsPage();renderHistory()
 }
 function productCard(p,inventory=false){const c=total(p),d=diff(p),cl=c===0?'':d===0?'diff-good':'diff-bad';return `<article class="product-card"><h4>${esc(p.name)}</h4><div class="meta">${esc(p.barcode||'ohne Barcode')}</div><div class="numbers"><div><small>Soll</small><strong>${p.expected}</strong></div><div><small>Ist</small><strong>${c}</strong></div><div><small>Diff.</small><strong class="${cl}">${c?(d>0?'+':'')+d:'–'}</strong></div></div></article>`}
-function renderArticles(){const q=tx($('articleSearch').value).toLowerCase(),list=products.filter(p=>!q||p.name.toLowerCase().includes(q)||(p.barcode||'').includes(q));$('articleCards').innerHTML=list.length?list.map(p=>{const c=total(p),order=Math.max(0,(p.min||0)-c);return `<article class="product-card"><h4>${esc(p.name)}</h4><div class="meta">${esc(p.barcode||'–')}</div><div class="numbers"><div><small>Ist</small><strong>${c}</strong></div><div><small>EK</small><strong>${p.buy?euro(p.buy):'–'}</strong></div><div><small>Nachbest.</small><strong class="${order?'diff-bad':'diff-good'}">${order||'OK'}</strong></div></div></article>`}).join(''):'<p style="color:#777">Keine Artikel.</p>'}
+
+function renderSuggestions(){
+ const box=$('searchSuggestions'),q=tx($('articleSearch').value).toLowerCase();
+ if(!q){box.classList.add('hidden');box.innerHTML='';return}
+ const matches=products.filter(p=>p.name.toLowerCase().includes(q)||(p.barcode||'').toLowerCase().includes(q)).slice(0,7);
+ if(!matches.length){box.innerHTML='<div style="padding:12px;color:#777">Kein passender Artikel gefunden.</div>';box.classList.remove('hidden');return}
+ box.innerHTML=matches.map(p=>`<button class="suggestion-item" data-id="${p.id}">
+   <div><strong>${esc(p.name)}</strong><small>${esc(p.barcode||'ohne Barcode')}</small></div>
+   <span class="suggestion-stock">Ist ${total(p)}</span>
+ </button>`).join('');
+ box.classList.remove('hidden');
+ box.querySelectorAll('.suggestion-item').forEach(b=>b.addEventListener('click',()=>{
+   const p=products.find(x=>String(x.id)===String(b.dataset.id)); if(!p)return;
+   $('articleSearch').value=p.name; box.classList.add('hidden'); renderArticles();
+   setTimeout(()=>document.querySelector(`[data-product-id="${CSS.escape(String(p.id))}"]`)?.scrollIntoView({behavior:'smooth',block:'center'}),50);
+ }));
+}
+async function startArticleScanner(){
+ if(typeof Html5Qrcode==='undefined'){toast('Scanner konnte nicht geladen werden');return}
+ $('articleScannerModal').classList.remove('hidden');
+ try{
+   articleScanner=new Html5Qrcode('articleReader');
+   await articleScanner.start({facingMode:'environment'},{fps:12,qrbox:{width:280,height:160}},async code=>{
+     const p=find(code);
+     if(!p){toast('Barcode nicht im Bestand gefunden');return}
+     $('articleSearch').value=p.name;
+     await stopArticleScanner();
+     renderArticles();
+     toast(p.name);
+     setTimeout(()=>document.querySelector(`[data-product-id="${CSS.escape(String(p.id))}"]`)?.scrollIntoView({behavior:'smooth',block:'center'}),80);
+   });
+ }catch(e){toast('Kamera konnte nicht gestartet werden');$('articleScannerModal').classList.add('hidden')}
+}
+async function stopArticleScanner(){
+ try{if(articleScanner){await articleScanner.stop();await articleScanner.clear();articleScanner=null}}catch(e){}
+ $('articleScannerModal').classList.add('hidden');
+}
+function renderArticles(){const q=tx($('articleSearch').value).toLowerCase(),list=products.filter(p=>!q||p.name.toLowerCase().includes(q)||(p.barcode||'').includes(q));$('articleCards').innerHTML=list.length?list.map(p=>{const c=total(p),order=Math.max(0,(p.min||0)-c);return `<article class="product-card" data-product-id="${esc(p.id)}"><h4>${esc(p.name)}</h4><div class="meta">${esc(p.barcode||'–')}</div><div class="numbers"><div><small>Ist</small><strong>${c}</strong></div><div><small>EK</small><strong>${p.buy?euro(p.buy):'–'}</strong></div><div><small>Nachbest.</small><strong class="${order?'diff-bad':'diff-good'}">${order||'OK'}</strong></div></div></article>`}).join(''):'<p style="color:#777">Keine Artikel.</p>'}
 function renderStats(){let ev=0,cv=0,rv=0;products.forEach(p=>{ev+=p.expected*p.buy;cv+=total(p)*p.buy;rv+=total(p)*p.sell});$('sExpected').textContent=euro(ev);$('sCounted').textContent=euro(cv);$('sRetail').textContent=euro(rv);$('sMargin').textContent=euro(rv-cv);const orders=products.map(p=>({p,n:Math.max(0,(p.min||0)-total(p))})).filter(x=>x.n>0);$('orders').innerHTML=orders.length?orders.map(x=>`<div class="order-row"><span>${esc(x.p.name)}</span><b class="diff-bad">${x.n} Stk.</b></div>`).join(''):'<p style="color:#777">Keine Bestellvorschläge.</p>';$('locationStats').innerHTML=locations.map(l=>{const pcs=products.reduce((a,p)=>a+num((p.counts||{})[l]),0),v=products.reduce((a,p)=>a+num((p.counts||{})[l])*p.buy,0);return `<div class="order-row"><span>${esc(l)}</span><b>${pcs} Stk. · ${euro(v)}</b></div>`}).join('')}
-function renderLocationsPage(){$('locationPage').innerHTML=locations.map(l=>{const pcs=products.reduce((a,p)=>a+num((p.counts||{})[l]),0),items=products.filter(p=>num((p.counts||{})[l])>0).length;return `<article class="location-card"><span class="kicker gold">LAGERORT</span><h3>${esc(l)}</h3><strong>${pcs} Stück</strong><p style="color:#777">${items} verschiedene Artikel gezählt</p></article>`}).join('')}
+function renderLocationsPage(){
+ $('locationPage').innerHTML=locations.map(l=>{
+   const pcs=products.reduce((a,p)=>a+num((p.counts||{})[l]),0),
+         items=products.filter(p=>num((p.counts||{})[l])>0).length,
+         value=products.reduce((a,p)=>a+num((p.counts||{})[l])*p.buy,0);
+   return `<article class="location-card" data-location="${esc(l)}">
+     <span class="kicker gold">LAGERORT</span>
+     <h3>${esc(l)}</h3>
+     <strong>${pcs} Stück</strong>
+     <p style="color:#777">${items} Artikel · ${euro(value)} EK-Wert</p>
+     <span class="open-location">Produkte anzeigen →</span>
+   </article>`
+ }).join('');
+
+ document.querySelectorAll('.location-card[data-location]').forEach(card=>{
+   card.addEventListener('click',()=>showLocationDetail(card.dataset.location));
+ });
+
+ if(activeLocationDetail && locations.includes(activeLocationDetail)) showLocationDetail(activeLocationDetail,false);
+}
+function showLocationDetail(loc,scroll=true){
+ activeLocationDetail=loc;
+ const rows=products.filter(p=>num((p.counts||{})[loc])>0).sort((a,b)=>a.name.localeCompare(b.name,'de'));
+ const pieces=rows.reduce((a,p)=>a+num((p.counts||{})[loc]),0);
+ const value=rows.reduce((a,p)=>a+num((p.counts||{})[loc])*p.buy,0);
+ $('locationDetailTitle').textContent=loc;
+ $('locationDetailMeta').textContent=`${rows.length} verschiedene Artikel · ${pieces} Stück · ${euro(value)} EK-Wert`;
+ $('locationProducts').innerHTML=rows.length?rows.map(p=>{
+   const locCount=num((p.counts||{})[loc]), totalAll=total(p);
+   return `<article class="location-product">
+      <h4>${esc(p.name)}</h4>
+      <div class="lp-meta">Barcode: ${esc(p.barcode||'–')}</div>
+      <div class="lp-count"><div><span>in ${esc(loc)}</span><strong>${locCount}</strong></div><div style="text-align:right"><span>gesamt gezählt</span><strong style="color:#ddd">${totalAll}</strong></div></div>
+   </article>`
+ }).join(''):'<p style="color:#777">In diesem Lagerort wurde noch kein Produkt gezählt.</p>';
+ $('locationDetail').classList.remove('hidden');
+ if(scroll) $('locationDetail').scrollIntoView({behavior:'smooth',block:'start'});
+}
 function renderHistory(){let h=[];try{h=JSON.parse(localStorage.getItem(HIST)||'[]')}catch(e){};$('history').innerHTML=h.length?h.map(x=>`<div class="order-row"><div><strong>${esc(x.title)}</strong><small style="display:block;color:#777">${esc(x.date)}</small></div><b>${x.counted}/${x.total}</b></div>`).join(''):'<p style="color:#777">Noch keine abgeschlossene Inventur.</p>'}
 function selectProduct(){const p=find($('searchInput').value);if(!p){toast('Artikel nicht gefunden');return}current=p;$('countPanel').classList.remove('hidden');$('countName').textContent=p.name;$('countMeta').textContent=`Soll ${p.expected} · bisher Ist ${total(p)} · ${$('locationSelect').value}`;$('qty').value=1}
 function saveCount(){if(!current)return;const q=Math.max(0,num($('qty').value)),loc=$('locationSelect').value;current.counts=current.counts||{};current.counts[loc]=num(current.counts[loc])+q;recent.unshift({name:current.name,qty:q,loc,at:new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})});recent=recent.slice(0,8);$('countPanel').classList.add('hidden');$('searchInput').value='';current=null;save();render();toast('Menge gespeichert')}
@@ -56,8 +130,12 @@ $('themeBtn').addEventListener('click',()=>{theme=theme==='dark'?'light':'dark';
 $('demoBtn').addEventListener('click',demo);$('dashImport').addEventListener('change',e=>importFile(e.target.files[0]));$('inventoryImport').addEventListener('change',e=>importFile(e.target.files[0]));
 $('addLocation').addEventListener('click',()=>{const l=tx($('newLocation').value);if(l&&!locations.includes(l)){locations.push(l);$('newLocation').value='';save();render()}});
 $('findProduct').addEventListener('click',selectProduct);$('searchInput').addEventListener('keydown',e=>{if(e.key==='Enter')selectProduct()});$('plus').addEventListener('click',()=>$('qty').value=num($('qty').value)+1);$('minus').addEventListener('click',()=>$('qty').value=Math.max(0,num($('qty').value)-1));$('saveCount').addEventListener('click',saveCount);
-$('startScanner').addEventListener('click',startScanner);$('stopScanner').addEventListener('click',stopScanner);$('articleSearch').addEventListener('input',renderArticles);$('exportCsv').addEventListener('click',exportCsv);$('finishInventory').addEventListener('click',finish);
+$('startScanner').addEventListener('click',startScanner);$('stopScanner').addEventListener('click',stopScanner);$('articleSearch').addEventListener('input',()=>{renderArticles();renderSuggestions()});$('exportCsv').addEventListener('click',exportCsv);$('finishInventory').addEventListener('click',finish);
 $('resetData').addEventListener('click',()=>{if(confirm('Laufende Inventur wirklich löschen?')){products=[];recent=[];localStorage.removeItem(KEY);render();toast('Inventur gelöscht')}});
+$('closeLocationDetail').addEventListener('click',()=>{$('locationDetail').classList.add('hidden');activeLocationDetail=null});
+$('articleScanBtn').addEventListener('click',startArticleScanner);
+$('articleScanClose').addEventListener('click',stopArticleScanner);
+document.addEventListener('click',e=>{if(!e.target.closest('.article-search-wrap'))$('searchSuggestions').classList.add('hidden')});
 
 if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js').catch(()=>{}));
 load();render();
