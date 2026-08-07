@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+<meta name="theme-color" content="#111827"/>
+<title>Inventur Scan</title>
+
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Inventur Scan">
+<link rel="apple-touch-icon" href="icon-192.png">
+
+<style>
+:root{
+ --bg:#f4f6f8;--card:#fff;--text:#111827;--muted:#6b7280;--line:#e5e7eb;
+ --accent:#111827;--soft:#f3f4f6;--ok:#166534;--okbg:#dcfce7;--warn:#92400e;--warnbg:#fef3c7;
+ --bad:#991b1b;--badbg:#fee2e2;--radius:18px
+}
+*{box-sizing:border-box} body{margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--text)}
+button,input,select{font:inherit}.app{max-width:1180px;margin:0 auto;padding:16px 16px 90px}.topbar{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px}
+.brand{font-size:23px;font-weight:850;letter-spacing:-.02em}.sub,.muted{color:var(--muted)}.sub{font-size:13px}.pill{font-size:13px;background:#eef2ff;border-radius:999px;padding:8px 12px}
+.tabs{display:flex;gap:8px;overflow:auto;padding-bottom:8px;margin-bottom:12px}.tab{border:0;background:#e5e7eb;padding:10px 14px;border-radius:999px;font-weight:750;white-space:nowrap}.tab.active{background:#111827;color:#fff}
+.page{display:none}.page.active{display:block}.grid{display:grid;grid-template-columns:repeat(12,1fr);gap:14px}.span-12{grid-column:span 12}.span-8{grid-column:span 8}.span-6{grid-column:span 6}.span-4{grid-column:span 4}.span-3{grid-column:span 3}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:17px;box-shadow:0 2px 12px rgba(17,24,39,.04)}
+h2{font-size:18px;margin:0 0 10px}h3{font-size:15px;margin:0 0 8px}.btn{border:0;border-radius:13px;padding:12px 15px;min-height:46px;font-weight:780;cursor:pointer}.btn-primary{background:#111827;color:#fff}.btn-soft{background:var(--soft);color:#111827}.btn-danger{background:#fff1f2;color:#9f1239}
+.btn-row{display:flex;gap:9px;flex-wrap:wrap}.input{width:100%;border:1px solid #d1d5db;border-radius:13px;padding:12px 13px;min-height:46px;background:#fff}.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}.row3{display:grid;grid-template-columns:1.2fr .8fr .8fr;gap:10px}
+.stat{font-size:27px;font-weight:850}.stat-label{font-size:12px;color:var(--muted)}.progress{height:10px;background:#e5e7eb;border-radius:999px;overflow:hidden}.progress>div{height:100%;background:#111827}
+.scanner{min-height:175px;border:2px dashed #cbd5e1;border-radius:16px;background:#fafafa;display:flex;align-items:center;justify-content:center;text-align:center;padding:20px}.hidden{display:none!important}
+table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:10px 8px;border-bottom:1px solid var(--line);text-align:left}th{color:var(--muted);font-weight:750}.right{text-align:right}
+.badge{display:inline-block;padding:6px 8px;border-radius:999px;font-size:12px;font-weight:750}.ok{color:var(--ok);background:var(--okbg)}.warn{color:var(--warn);background:var(--warnbg)}.bad{color:var(--bad);background:var(--badbg)}
+.metric{padding:14px;border:1px solid var(--line);border-radius:15px;background:#fafafa}.metric strong{font-size:21px;display:block;margin-top:3px}.listrow{display:flex;justify-content:space-between;gap:12px;padding:11px 0;border-bottom:1px solid var(--line)}.listrow:last-child{border-bottom:0}
+dialog{border:0;border-radius:20px;max-width:560px;width:calc(100% - 28px);padding:0;box-shadow:0 25px 80px rgba(0,0,0,.25)}dialog::backdrop{background:rgba(15,23,42,.48)}.modal{padding:20px}.toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:#111827;color:#fff;border-radius:999px;padding:12px 16px;font-weight:750;z-index:50}
+.small{font-size:12px}.section-title{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+@media(max-width:800px){.span-8,.span-6,.span-4,.span-3{grid-column:span 12}.row2,.row3{grid-template-columns:1fr}.app{padding:13px 13px 80px}.card{padding:15px}.stat{font-size:24px}}
+</style>
+</head>
+<body>
+<div class="app">
+ <div class="topbar">
+   <div><div class="brand">Inventur Scan</div><div class="sub">Lokale Testversion · Daten bleiben auf diesem Gerät</div></div>
+   <div class="pill" id="saveState">Nicht gestartet</div>
+ </div>
+
+ <div class="tabs">
+   <button class="tab active" data-page="inventory">Inventur</button>
+   <button class="tab" data-page="articles">Artikel</button>
+   <button class="tab" data-page="stats">Auswertung</button>
+   <button class="tab" data-page="history">Historie</button>
+ </div>
+
+ <section class="page active" id="page-inventory">
+   <div class="grid">
+     <div class="card span-12">
+       <div class="section-title">
+        <div><h2>Warenbestand laden</h2><div class="sub">CSV oder Excel importieren. Spalten werden automatisch erkannt.</div></div>
+        <div class="btn-row">
+          <label class="btn btn-primary" for="fileInput">Datei importieren</label><input id="fileInput" type="file" accept=".csv,.xlsx,.xls" class="hidden">
+          <button class="btn btn-soft" id="demoBtn">Demo laden</button>
+          <button class="btn btn-danger" id="resetBtn">Neu starten</button>
+        </div>
+       </div>
+       <div style="margin-top:14px" class="progress"><div id="progressBar" style="width:0"></div></div>
+       <div class="sub" style="margin-top:7px" id="progressText">Noch keine Daten geladen.</div>
+     </div>
+
+     <div class="card span-8">
+       <h2>Artikel erfassen</h2>
+       <div class="row2">
+         <div>
+           <label class="sub">Lagerort</label>
+           <select class="input" id="locationSelect"></select>
+         </div>
+         <div>
+           <label class="sub">Neuen Lagerort hinzufügen</label>
+           <div style="display:flex;gap:8px"><input class="input" id="newLocation" placeholder="z. B. Keller"><button class="btn btn-soft" id="addLocationBtn">+</button></div>
+         </div>
+       </div>
+
+       <div class="scanner" id="scannerBox" style="margin-top:13px">
+        <div><div style="font-size:40px">▣</div><strong>Barcode scannen</strong><div class="muted small" style="margin-top:6px">Kamera oder Barcode/Artikelname eintippen.</div><button class="btn btn-primary" id="scanBtn" style="margin-top:12px">Kamera starten</button></div>
+       </div>
+       <div id="readerWrap" class="hidden" style="margin-top:10px"><div id="reader"></div><button class="btn btn-soft" id="stopScanBtn">Scanner schließen</button></div>
+
+       <div class="row3" style="margin-top:13px">
+         <input class="input" id="searchInput" placeholder="Barcode oder Artikelname">
+         <input class="input" id="qtyInput" type="number" min="0" step="1" value="1" placeholder="Menge">
+         <button class="btn btn-primary" id="addBtn">Hinzufügen</button>
+       </div>
+       <div id="activeProduct" class="hidden" style="margin-top:12px;padding:14px;border:1px solid var(--line);border-radius:15px;background:#fafafa"></div>
+       <div class="btn-row" style="margin-top:10px"><button class="btn btn-soft" id="newProductBtn">+ Artikel anlegen</button><button class="btn btn-soft" id="pauseBtn">Inventur speichern / pausieren</button></div>
+     </div>
+
+     <aside class="card span-4">
+       <h2>Status</h2>
+       <div class="grid" style="gap:10px">
+        <div class="span-6"><div class="stat" id="totalItems">0</div><div class="stat-label">Artikel</div></div>
+        <div class="span-6"><div class="stat" id="countedItems">0</div><div class="stat-label">Erfasst</div></div>
+        <div class="span-6"><div class="stat" id="matchingItems">0</div><div class="stat-label">Passt</div></div>
+        <div class="span-6"><div class="stat" id="diffItems">0</div><div class="stat-label">Abweichungen</div></div>
+       </div>
+       <hr style="border:0;border-top:1px solid var(--line);margin:15px 0">
+       <h3>Zuletzt erfasst</h3><div id="recentList" class="muted">Noch nichts erfasst.</div>
+     </aside>
+
+     <div class="card span-12">
+       <div class="section-title">
+        <div><h2>Soll / Ist / Differenz</h2><div class="sub">Mehrere Scans desselben Artikels und verschiedener Lagerorte werden addiert.</div></div>
+        <div class="btn-row"><button class="btn btn-soft" id="diffFilterBtn">Nur Abweichungen</button><button class="btn btn-primary" id="finishBtn">Inventur abschließen</button></div>
+       </div>
+       <div style="overflow:auto;margin-top:10px">
+        <table><thead><tr><th>Artikel</th><th>Barcode</th><th class="right">Soll</th><th class="right">Ist</th><th class="right">Diff.</th><th>Lagerorte</th><th>Status</th></tr></thead><tbody id="inventoryBody"></tbody></table>
+       </div>
+     </div>
+   </div>
+ </section>
+
+ <section class="page" id="page-articles">
+   <div class="card">
+    <div class="section-title"><div><h2>Artikelübersicht</h2><div class="sub">Suche, Preise, Mindestbestand und Bestellvorschläge.</div></div><button class="btn btn-soft" id="exportBtn">CSV exportieren</button></div>
+    <input class="input" id="articleSearch" placeholder="Artikel oder Barcode suchen..." style="margin-top:12px">
+    <div style="overflow:auto;margin-top:10px"><table><thead><tr><th>Artikel</th><th>Barcode</th><th class="right">Soll</th><th class="right">Ist</th><th class="right">EK</th><th class="right">VK</th><th class="right">Min.</th><th>Bestellung</th></tr></thead><tbody id="articleBody"></tbody></table></div>
+   </div>
+ </section>
+
+ <section class="page" id="page-stats">
+   <div class="grid">
+    <div class="card span-3"><div class="sub">Soll-Lagerwert (EK)</div><div class="stat" id="stockValueExpected">0,00 €</div></div>
+    <div class="card span-3"><div class="sub">Gezählter Lagerwert (EK)</div><div class="stat" id="stockValueCounted">0,00 €</div></div>
+    <div class="card span-3"><div class="sub">VK-Wert gezählt</div><div class="stat" id="retailValue">0,00 €</div></div>
+    <div class="card span-3"><div class="sub">Potenzielle Marge</div><div class="stat" id="marginValue">0,00 €</div></div>
+    <div class="card span-6"><h2>Lagerorte</h2><div id="locationStats" class="muted">Noch keine Daten.</div></div>
+    <div class="card span-6"><h2>Bestellvorschläge</h2><div id="orderSuggestions" class="muted">Keine Vorschläge.</div></div>
+   </div>
+ </section>
+
+ <section class="page" id="page-history">
+   <div class="card">
+    <h2>Inventurhistorie</h2>
+    <p class="muted">Abgeschlossene Inventuren werden lokal auf diesem Gerät gespeichert.</p>
+    <div id="historyList">Noch keine abgeschlossene Inventur.</div>
+   </div>
+ </section>
+</div>
+
+<dialog id="newProductDialog"><div class="modal">
+ <h2>Neuen Artikel anlegen</h2>
+ <div class="row2"><input class="input" id="npName" placeholder="Artikelname"><input class="input" id="npBarcode" placeholder="Barcode"></div>
+ <div class="row2" style="margin-top:10px"><input class="input" id="npStock" type="number" min="0" placeholder="Soll-Bestand"><input class="input" id="npQty" type="number" min="0" value="1" placeholder="Jetzt gezählt"></div>
+ <div class="row2" style="margin-top:10px"><input class="input" id="npBuy" type="number" min="0" step="0.01" placeholder="Einkaufspreis €"><input class="input" id="npSell" type="number" min="0" step="0.01" placeholder="Verkaufspreis €"></div>
+ <div style="margin-top:10px"><input class="input" id="npMin" type="number" min="0" placeholder="Mindestbestand (optional)"></div>
+ <div class="btn-row" style="justify-content:flex-end;margin-top:15px"><button class="btn btn-soft" id="cancelNp">Abbrechen</button><button class="btn btn-primary" id="saveNp">Speichern</button></div>
+</div></dialog>
+
+<div id="toast" class="toast hidden"></div>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://unpkg.com/html5-qrcode"></script>
+<script>
+const $=id=>document.getElementById(id);
+const KEY='inventur_scan_state_v2', HIST='inventur_scan_history_v2';
+let products=[],locations=['Salon','Keller'],recent=[],showDiffOnly=false,scanner=null;
+
+function num(v){const n=Number(String(v??'').replace(',','.'));return Number.isFinite(n)?n:0}
+function norm(v){return String(v??'').trim()}
+function eur(v){return new Intl.NumberFormat('de-DE',{style:'currency',currency:'EUR'}).format(v||0)}
+function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
+function toast(t){$('toast').textContent=t;$('toast').classList.remove('hidden');setTimeout(()=>$('toast').classList.add('hidden'),1700)}
+function detect(obj,cands){const keys=Object.keys(obj);for(const c of cands){let k=keys.find(x=>x.toLowerCase().replace(/[\s_-]/g,'')===c.toLowerCase().replace(/[\s_-]/g,''));if(k)return obj[k]}for(const k of keys){if(cands.some(c=>k.toLowerCase().includes(c.toLowerCase())))return obj[k]}return''}
+function totalCount(p){return Object.values(p.counts||{}).reduce((a,b)=>a+num(b),0)}
+function diff(p){return totalCount(p)-p.expected}
+function autoSave(){localStorage.setItem(KEY,JSON.stringify({products,locations,recent,updated:new Date().toISOString()}));$('saveState').textContent='Automatisch gespeichert'}
+function loadSaved(){try{const s=JSON.parse(localStorage.getItem(KEY)||'null');if(s){products=s.products||[];locations=s.locations?.length?s.locations:['Salon','Keller'];recent=s.recent||[];$('saveState').textContent='Fortgesetzt';return true}}catch(e){}return false}
+function renderLocations(){const sel=$('locationSelect'),cur=sel.value;sel.innerHTML=locations.map(x=>`<option>${esc(x)}</option>`).join('');if(locations.includes(cur))sel.value=cur}
+function findProduct(q){q=norm(q).toLowerCase();if(!q)return null;return products.find(p=>(p.barcode||'').toLowerCase()===q)||products.find(p=>p.name.toLowerCase().includes(q))||null}
+
+function mapRows(rows){
+ products=rows.map((r,i)=>({id:(crypto.randomUUID?crypto.randomUUID():'p'+Date.now()+i),name:norm(detect(r,['Artikel','Artikelname','Produkt','Produktname','Bezeichnung','Name']))||'Unbenannter Artikel',barcode:norm(detect(r,['Barcode','EAN','GTIN','Artikelnummer','Code'])),expected:num(detect(r,['Bestand','Soll','Lagerbestand','Warenbestand','Menge','Stock'])),buy:num(detect(r,['Einkaufspreis','EK','Purchase Price'])),sell:num(detect(r,['Verkaufspreis','VK','Retail Price'])),min:num(detect(r,['Mindestbestand','Min Bestand','Minimum'])),counts:{}})).filter(p=>p.name||p.barcode);
+ recent=[];autoSave();render();toast(products.length+' Artikel geladen')
+}
+function demo(){
+ products=[
+ {id:'1',name:'Shampoo Repair 250 ml',barcode:'4000000000011',expected:10,buy:6.2,sell:14.9,min:4,counts:{}},
+ {id:'2',name:'Conditioner Color 200 ml',barcode:'4000000000028',expected:6,buy:7.1,sell:16.9,min:3,counts:{}},
+ {id:'3',name:'Haarspray Strong 300 ml',barcode:'4000000000035',expected:8,buy:5.7,sell:13.5,min:3,counts:{}},
+ {id:'4',name:'Styling Paste Matt 100 ml',barcode:'4000000000042',expected:4,buy:8.4,sell:18.9,min:2,counts:{}},
+ {id:'5',name:'Haaröl Premium 100 ml',barcode:'4000000000059',expected:5,buy:9.8,sell:22.5,min:2,counts:{}}
+ ];recent=[];autoSave();render();toast('Demo-Daten geladen')
+}
+function addCount(){
+ const p=findProduct($('searchInput').value),qty=Math.max(0,num($('qtyInput').value)),loc=$('locationSelect').value||'Salon';
+ if(!p){$('npBarcode').value=/^\d+$/.test($('searchInput').value)?$('searchInput').value:'';$('npName').value=/^\d+$/.test($('searchInput').value)?'':$('searchInput').value;$('newProductDialog').showModal();return}
+ p.counts=p.counts||{};p.counts[loc]=num(p.counts[loc])+qty;recent.unshift({name:p.name,qty,loc,at:new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})});recent=recent.slice(0,6);
+ $('searchInput').value='';$('qtyInput').value='1';autoSave();render();toast(`${p.name}: +${qty} · ${loc}`)
+}
+function render(){
+ renderLocations();
+ const total=products.length,counted=products.filter(p=>totalCount(p)>0).length,match=products.filter(p=>totalCount(p)>0&&diff(p)===0).length,diffs=products.filter(p=>totalCount(p)>0&&diff(p)!==0).length,pct=total?Math.round(counted/total*100):0;
+ $('totalItems').textContent=total;$('countedItems').textContent=counted;$('matchingItems').textContent=match;$('diffItems').textContent=diffs;$('progressBar').style.width=pct+'%';$('progressText').textContent=total?`${counted} von ${total} Artikeln erfasst (${pct} %).`:'Noch keine Daten geladen.';
+ let list=showDiffOnly?products.filter(p=>totalCount(p)>0&&diff(p)!==0):products;
+ $('inventoryBody').innerHTML=list.length?list.map(p=>{let c=totalCount(p),d=diff(p),status=c===0?['warn','Offen']:d===0?['ok','Passt']:['bad','Abweichung'];let locs=Object.entries(p.counts||{}).filter(x=>x[1]>0).map(([k,v])=>`${esc(k)}: ${v}`).join(', ')||'–';return `<tr><td><strong>${esc(p.name)}</strong></td><td>${esc(p.barcode||'–')}</td><td class="right">${p.expected}</td><td class="right">${c}</td><td class="right">${c?((d>0?'+':'')+d):'–'}</td><td>${locs}</td><td><span class="badge ${status[0]}">${status[1]}</span></td></tr>`}).join(''):'<tr><td colspan="7" class="muted">Noch keine Daten.</td></tr>';
+ $('recentList').innerHTML=recent.length?recent.map(r=>`<div class="listrow"><div><strong>${esc(r.name)}</strong><div class="small muted">${esc(r.loc)} · ${r.at}</div></div><strong>+${r.qty}</strong></div>`).join(''):'Noch nichts erfasst.';
+ const p=findProduct($('searchInput').value);if(p){$('activeProduct').classList.remove('hidden');$('activeProduct').innerHTML=`<strong>${esc(p.name)}</strong><div class="muted small" style="margin-top:5px">Soll ${p.expected} · Ist ${totalCount(p)} · Barcode ${esc(p.barcode||'–')}</div>`}else $('activeProduct').classList.add('hidden');
+ renderArticles();renderStats();renderHistory()
+}
+function renderArticles(){
+ const q=norm($('articleSearch').value).toLowerCase(),list=products.filter(p=>!q||p.name.toLowerCase().includes(q)||(p.barcode||'').includes(q));
+ $('articleBody').innerHTML=list.length?list.map(p=>{let c=totalCount(p),order=Math.max(0,(p.min||0)-c);return `<tr><td>${esc(p.name)}</td><td>${esc(p.barcode||'–')}</td><td class="right">${p.expected}</td><td class="right">${c}</td><td class="right">${p.buy?eur(p.buy):'–'}</td><td class="right">${p.sell?eur(p.sell):'–'}</td><td class="right">${p.min||'–'}</td><td>${order>0?`<span class="badge bad">${order} nachbestellen</span>`:'<span class="badge ok">OK</span>'}</td></tr>`}).join(''):'<tr><td colspan="8" class="muted">Keine Artikel.</td></tr>'
+}
+function renderStats(){
+ let ev=0,cv=0,rv=0;products.forEach(p=>{ev+=p.expected*p.buy;cv+=totalCount(p)*p.buy;rv+=totalCount(p)*p.sell});$('stockValueExpected').textContent=eur(ev);$('stockValueCounted').textContent=eur(cv);$('retailValue').textContent=eur(rv);$('marginValue').textContent=eur(rv-cv);
+ $('locationStats').innerHTML=locations.map(loc=>{let pieces=products.reduce((a,p)=>a+num((p.counts||{})[loc]),0);let value=products.reduce((a,p)=>a+num((p.counts||{})[loc])*p.buy,0);return `<div class="listrow"><span>${esc(loc)}</span><strong>${pieces} Stk. · ${eur(value)}</strong></div>`}).join('')||'Noch keine Daten.';
+ const orders=products.map(p=>({p,n:Math.max(0,(p.min||0)-totalCount(p))})).filter(x=>x.n>0);$('orderSuggestions').innerHTML=orders.length?orders.map(x=>`<div class="listrow"><span>${esc(x.p.name)}</span><strong>${x.n} Stk.</strong></div>`).join(''):'Keine Vorschläge.'
+}
+function renderHistory(){
+ let h=[];try{h=JSON.parse(localStorage.getItem(HIST)||'[]')}catch(e){}
+ $('historyList').innerHTML=h.length?h.map(x=>`<div class="listrow"><div><strong>${esc(x.title)}</strong><div class="small muted">${esc(x.date)}</div></div><div style="text-align:right"><strong>${x.counted}/${x.total}</strong><div class="small muted">${x.diffs} Abweichungen</div></div></div>`).join(''):'Noch keine abgeschlossene Inventur.'
+}
+function finish(){
+ if(!products.length){toast('Keine Inventur vorhanden');return}
+ let h=[];try{h=JSON.parse(localStorage.getItem(HIST)||'[]')}catch(e){};let now=new Date();h.unshift({title:'Inventur '+now.toLocaleDateString('de-DE'),date:now.toLocaleString('de-DE'),total:products.length,counted:products.filter(p=>totalCount(p)>0).length,diffs:products.filter(p=>totalCount(p)>0&&diff(p)!==0).length,value:products.reduce((a,p)=>a+totalCount(p)*p.buy,0)});localStorage.setItem(HIST,JSON.stringify(h.slice(0,20)));renderHistory();exportCSV();toast('Inventur abgeschlossen und gespeichert')
+}
+function exportCSV(){if(!products.length){toast('Keine Daten');return}let rows=[['Artikel','Barcode','Soll','Ist','Differenz','Einkaufspreis','Verkaufspreis','Mindestbestand','Lagerorte']];products.forEach(p=>rows.push([p.name,p.barcode,p.expected,totalCount(p),diff(p),p.buy||'',p.sell||'',p.min||'',Object.entries(p.counts||{}).map(([k,v])=>`${k}:${v}`).join('|')]));let csv=rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(';')).join('\n');let blob=new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='inventur-ergebnis.csv';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),500)}
+async function startScanner(){if(typeof Html5Qrcode==='undefined'){toast('Scanner konnte nicht geladen werden');return}$('scannerBox').classList.add('hidden');$('readerWrap').classList.remove('hidden');try{scanner=new Html5Qrcode('reader');await scanner.start({facingMode:'environment'},{fps:10,qrbox:{width:260,height:150}},code=>{$('searchInput').value=code;render();if(navigator.vibrate)navigator.vibrate(70)})}catch(e){toast('Kamera konnte nicht gestartet werden');$('scannerBox').classList.remove('hidden');$('readerWrap').classList.add('hidden')}}
+async function stopScanner(){try{if(scanner){await scanner.stop();await scanner.clear();scanner=null}}catch(e){}$('scannerBox').classList.remove('hidden');$('readerWrap').classList.add('hidden')}
+
+document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));b.classList.add('active');$('page-'+b.dataset.page).classList.add('active')});
+$('demoBtn').onclick=demo;$('resetBtn').onclick=()=>{if(confirm('Laufende Inventur wirklich löschen?')){products=[];recent=[];localStorage.removeItem(KEY);render();$('saveState').textContent='Nicht gestartet'}};
+$('addBtn').onclick=addCount;$('searchInput').oninput=render;$('searchInput').onkeydown=e=>{if(e.key==='Enter')addCount()};$('qtyInput').onkeydown=e=>{if(e.key==='Enter')addCount()};
+$('articleSearch').oninput=renderArticles;$('diffFilterBtn').onclick=()=>{showDiffOnly=!showDiffOnly;$('diffFilterBtn').textContent=showDiffOnly?'Alle Artikel':'Nur Abweichungen';render()};
+$('addLocationBtn').onclick=()=>{let n=norm($('newLocation').value);if(n&&!locations.includes(n)){locations.push(n);$('newLocation').value='';autoSave();render();$('locationSelect').value=n}};
+$('pauseBtn').onclick=()=>{autoSave();toast('Inventur gespeichert – du kannst später weitermachen')};$('finishBtn').onclick=finish;$('exportBtn').onclick=exportCSV;
+$('newProductBtn').onclick=()=>$('newProductDialog').showModal();$('cancelNp').onclick=()=>$('newProductDialog').close();
+$('saveNp').onclick=()=>{let name=norm($('npName').value);if(!name){toast('Artikelname fehlt');return}let loc=$('locationSelect').value||'Salon',q=num($('npQty').value),p={id:crypto.randomUUID?crypto.randomUUID():String(Date.now()),name,barcode:norm($('npBarcode').value),expected:num($('npStock').value),buy:num($('npBuy').value),sell:num($('npSell').value),min:num($('npMin').value),counts:{}};p.counts[loc]=q;products.push(p);recent.unshift({name:p.name,qty:q,loc,at:new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})});['npName','npBarcode','npStock','npBuy','npSell','npMin'].forEach(i=>$(i).value='');$('npQty').value='1';$('newProductDialog').close();autoSave();render();toast('Artikel angelegt')};
+$('scanBtn').onclick=startScanner;$('stopScanBtn').onclick=stopScanner;
+
+$('fileInput').addEventListener('change',async e=>{let f=e.target.files[0];if(!f)return;try{let ext=f.name.split('.').pop().toLowerCase();if(ext==='csv'){let text=await f.text(),head=text.split(/\r?\n/)[0],sep=(head.match(/;/g)||[]).length>(head.match(/,/g)||[]).length?';':',';let lines=text.split(/\r?\n/).filter(Boolean),headers=lines[0].split(sep).map(x=>x.replace(/^"|"$/g,'').trim()),rows=lines.slice(1).map(line=>{let vals=line.split(sep).map(x=>x.replace(/^"|"$/g,'').trim());return Object.fromEntries(headers.map((h,i)=>[h,vals[i]??'']))});mapRows(rows)}else{if(typeof XLSX==='undefined')throw new Error();let buf=await f.arrayBuffer(),wb=XLSX.read(buf,{type:'array'}),ws=wb.Sheets[wb.SheetNames[0]];mapRows(XLSX.utils.sheet_to_json(ws,{defval:''}))}}catch(err){toast('Datei konnte nicht gelesen werden')}});
+
+loadSaved();render();
+</script>
+
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./service-worker.js').catch(console.error);
+  });
+}
+</script>
+
+</body></html>
