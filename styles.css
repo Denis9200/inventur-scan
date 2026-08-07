@@ -66,3 +66,42 @@ button,input,select{font:inherit}.app-shell{max-width:1500px;margin:auto;display
  .suggestions{top:108px;max-width:none}
  .location-detail-head{flex-direction:column}
 }
+
+
+/* V5 Step 2 – Fullscreen Scanner */
+.fullscreen-scanner{
+  position:fixed;inset:0;z-index:120;background:#030303;color:white;
+  display:grid;grid-template-rows:auto 1fr auto auto;min-height:100dvh
+}
+.scanner-top{display:flex;justify-content:space-between;align-items:center;padding:18px 20px;border-bottom:1px solid #1d1d1d;background:#050505}
+.scanner-top h2{margin:4px 0 0;font-size:24px}
+.scanner-stage{position:relative;overflow:hidden;background:#000;min-height:0}
+#fullReader{position:absolute;inset:0;width:100%;height:100%}
+#fullReader video{width:100%!important;height:100%!important;object-fit:cover!important}
+#fullReader>div{border:0!important}
+.scan-overlay{position:absolute;inset:0;pointer-events:none;display:grid;place-items:center;background:linear-gradient(rgba(0,0,0,.34),rgba(0,0,0,.08) 30%,rgba(0,0,0,.08) 70%,rgba(0,0,0,.42))}
+.scan-frame{width:min(78vw,520px);aspect-ratio:1.65;border:2px solid rgba(255,255,255,.9);border-radius:18px;box-shadow:0 0 0 9999px rgba(0,0,0,.12);position:relative}
+.scan-frame:before,.scan-frame:after{content:"";position:absolute;left:4%;right:4%;height:2px;background:#e2332b;top:50%;box-shadow:0 0 9px rgba(226,51,43,.7)}
+.scan-overlay>span{position:absolute;bottom:8%;padding:8px 12px;border-radius:999px;background:rgba(0,0,0,.58);font-size:13px}
+.scanner-bottom{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:16px 18px;background:#050505;border-top:1px solid #1d1d1d}
+.scanner-tool{border:1px solid #332b19;background:#0d0d0d;color:#ddd;border-radius:16px;min-height:72px}
+.scanner-tool span{display:block;color:var(--gold2);font-size:25px;margin-bottom:3px}
+.scanner-tool small{color:#aaa}.scanner-cancel span{color:#fff;font-size:30px}
+.scanner-ready{text-align:center;padding:10px;background:#080808;color:#9b9b9b;font-size:12px}.scanner-ready i{display:inline-block;width:8px;height:8px;background:#56c94b;border-radius:50%;margin-right:7px}
+
+.product-scan-dialog{border:0;padding:0;border-radius:23px;background:#080808;color:#fff;max-width:590px;width:calc(100% - 24px);box-shadow:0 30px 100px rgba(0,0,0,.7)}
+.product-scan-dialog::backdrop{background:rgba(0,0,0,.72);backdrop-filter:blur(5px)}
+.product-scan-body{padding:20px;border:1px solid #5a4517;border-radius:23px}
+.product-scan-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.product-scan-head h2{font-size:25px;margin:4px 0}.product-scan-head p{color:#888;margin:0}
+.product-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:16px 0}
+.product-summary div{background:#101010;border:1px solid #242424;border-radius:14px;padding:12px}
+.product-summary span{display:block;color:#777;font-size:11px}.product-summary strong{display:block;font-size:24px;margin-top:4px}
+.scan-counter{display:flex;align-items:center;justify-content:center;gap:16px;margin:18px 0}
+.scan-counter button{width:66px;height:66px;border:1px solid #d1a431;border-radius:16px;background:linear-gradient(#dcb54e,#a67212);color:#160e00;font-size:31px}
+.scan-counter input{width:110px;height:70px;text-align:center;font-size:32px;font-weight:900;border-color:#4a3b1e}
+.product-scan-body .full+.full{margin-top:8px}
+@media(max-width:700px){
+  .scanner-top{padding:14px}.scanner-stage{min-height:0}.scanner-bottom{padding:11px}
+  .scanner-tool{min-height:64px}.scan-frame{width:86vw}.product-summary strong{font-size:20px}
+}

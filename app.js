@@ -1,7 +1,7 @@
 
 const $=id=>document.getElementById(id);
 const KEY='dj_inventur_v5_step1', HIST='dj_inventur_history_v5';
-let products=[],locations=['Salon','Keller'],recent=[],current=null,scanner=null,articleScanner=null,lastScan='',theme='dark',activeLocationDetail=null;
+let products=[],locations=['Salon','Keller'],recent=[],current=null,scanner=null,articleScanner=null,fullScanner=null,lastScan='',theme='dark',activeLocationDetail=null,scanProduct=null,scanRestartAfterSave=false,fullFacing='environment';
 
 const num=v=>{const x=Number(String(v??'').replace(',','.'));return Number.isFinite(x)?x:0};
 const tx=v=>String(v??'').trim();
@@ -26,7 +26,12 @@ function demo(){products=[
 {id:'4',name:'Styling Paste Matt 100 ml',barcode:'4000000000042',expected:4,buy:8.4,sell:18.9,min:2,counts:{}},
 {id:'5',name:'Haaröl Premium 100 ml',barcode:'4000000000059',expected:5,buy:9.8,sell:22.5,min:2,counts:{Salon:2,Keller:2}}
 ];recent=[{name:'Haaröl Premium 100 ml',qty:2,loc:'Keller',at:'10:18'},{name:'Conditioner Color 200 ml',qty:6,loc:'Salon',at:'10:12'}];save();render();toast('Demo-Daten geladen')}
-function renderLocations(){const s=$('locationSelect'),cur=s.value;s.innerHTML=locations.map(l=>`<option>${esc(l)}</option>`).join('');if(locations.includes(cur))s.value=cur}
+function renderLocations(){
+ const s=$('locationSelect'),cur=s.value;
+ s.innerHTML=locations.map(l=>`<option>${esc(l)}</option>`).join('');
+ if(locations.includes(cur))s.value=cur;
+ const ss=$('scanLocation'); if(ss){const cur2=ss.value;ss.innerHTML=locations.map(l=>`<option>${esc(l)}</option>`).join(''); if(locations.includes(cur2))ss.value=cur2; else if(locations.includes(s.value))ss.value=s.value}
+}
 function render(){
  renderLocations();
  const counted=products.filter(p=>total(p)>0).length,diffs=products.filter(p=>total(p)>0&&diff(p)!==0).length,pct=products.length?Math.round(counted/products.length*100):0,value=products.reduce((a,p)=>a+total(p)*p.buy,0),below=products.filter(p=>p.min&&total(p)<p.min).length;
@@ -118,6 +123,77 @@ function showLocationDetail(loc,scroll=true){
 function renderHistory(){let h=[];try{h=JSON.parse(localStorage.getItem(HIST)||'[]')}catch(e){};$('history').innerHTML=h.length?h.map(x=>`<div class="order-row"><div><strong>${esc(x.title)}</strong><small style="display:block;color:#777">${esc(x.date)}</small></div><b>${x.counted}/${x.total}</b></div>`).join(''):'<p style="color:#777">Noch keine abgeschlossene Inventur.</p>'}
 function selectProduct(){const p=find($('searchInput').value);if(!p){toast('Artikel nicht gefunden');return}current=p;$('countPanel').classList.remove('hidden');$('countName').textContent=p.name;$('countMeta').textContent=`Soll ${p.expected} · bisher Ist ${total(p)} · ${$('locationSelect').value}`;$('qty').value=1}
 function saveCount(){if(!current)return;const q=Math.max(0,num($('qty').value)),loc=$('locationSelect').value;current.counts=current.counts||{};current.counts[loc]=num(current.counts[loc])+q;recent.unshift({name:current.name,qty:q,loc,at:new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})});recent=recent.slice(0,8);$('countPanel').classList.add('hidden');$('searchInput').value='';current=null;save();render();toast('Menge gespeichert')}
+
+function openScanProduct(p,restart=true){
+ scanProduct=p;scanRestartAfterSave=restart;
+ $('scanProductName').textContent=p.name;
+ $('scanProductBarcode').textContent='Barcode: '+(p.barcode||'–');
+ $('scanSoll').textContent=p.expected;
+ $('scanIst').textContent=total(p);
+ const d=diff(p);
+ $('scanDiff').textContent=total(p)?((d>0?'+':'')+d):'–';
+ $('scanDiff').className=d===0&&total(p)>0?'diff-good':'diff-bad';
+ renderLocations();
+ $('scanLocation').value=$('locationSelect').value||locations[0]||'Salon';
+ $('scanQty').value=1;
+ $('scanProductDialog').showModal();
+}
+
+function saveScanProduct(restart){
+ if(!scanProduct)return;
+ const qty=Math.max(0,num($('scanQty').value)),loc=$('scanLocation').value||'Salon';
+ scanProduct.counts=scanProduct.counts||{};
+ scanProduct.counts[loc]=num(scanProduct.counts[loc])+qty;
+ recent.unshift({name:scanProduct.name,qty,loc,at:new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})});
+ recent=recent.slice(0,8);
+ $('locationSelect').value=loc;
+ $('scanProductDialog').close();
+ scanProduct=null;
+ save();render();toast('Artikel gespeichert');
+ if(navigator.vibrate)navigator.vibrate(80);
+ try{const A=window.AudioContext||window.webkitAudioContext,c=new A(),o=c.createOscillator(),g=c.createGain();o.connect(g);g.connect(c.destination);o.frequency.value=880;g.gain.value=.025;o.start();o.stop(c.currentTime+.07)}catch(e){}
+ if(restart)setTimeout(()=>openFullScanner(),250);
+}
+
+async function openFullScanner(){
+ if(typeof Html5Qrcode==='undefined'){toast('Scanner konnte nicht geladen werden');return}
+ $('fullScannerModal').classList.remove('hidden');
+ try{
+   fullScanner=new Html5Qrcode('fullReader');
+   await fullScanner.start({facingMode:fullFacing},{fps:14,qrbox:{width:300,height:180}},async code=>{
+      if(code===lastScan)return;
+      lastScan=code;setTimeout(()=>lastScan='',1300);
+      const p=find(code);
+      if(!p){toast('Barcode nicht im Bestand gefunden');return}
+      await closeFullScanner(false);
+      openScanProduct(p,true);
+   });
+ }catch(e){
+   toast('Kamera konnte nicht gestartet werden');
+   $('fullScannerModal').classList.add('hidden');
+ }
+}
+
+async function closeFullScanner(showIdle=true){
+ try{if(fullScanner){await fullScanner.stop();await fullScanner.clear();fullScanner=null}}catch(e){}
+ $('fullScannerModal').classList.add('hidden');
+}
+
+async function switchFullCamera(){
+ fullFacing=fullFacing==='environment'?'user':'environment';
+ await closeFullScanner(false);
+ setTimeout(()=>openFullScanner(),180);
+}
+
+async function toggleTorch(){
+ try{
+   if(!fullScanner){toast('Scanner ist nicht aktiv');return}
+   const caps=fullScanner.getRunningTrackCapabilities?.();
+   if(!caps?.torch){toast('Taschenlampe wird von dieser Kamera nicht unterstützt');return}
+   const settings=fullScanner.getRunningTrackSettings?.();
+   await fullScanner.applyVideoConstraints({advanced:[{torch:!settings?.torch}]});
+ }catch(e){toast('Taschenlampe konnte nicht geschaltet werden')}
+}
 async function startScanner(){if(typeof Html5Qrcode==='undefined'){toast('Scanner konnte nicht geladen werden');return}$('scannerIdle').classList.add('hidden');$('scannerLive').classList.remove('hidden');try{scanner=new Html5Qrcode('reader');await scanner.start({facingMode:'environment'},{fps:12,qrbox:{width:280,height:160}},code=>{if(code===lastScan)return;lastScan=code;setTimeout(()=>lastScan='',1200);$('searchInput').value=code;selectProduct()})}catch(e){toast('Kamera konnte nicht gestartet werden')}}
 async function stopScanner(){try{if(scanner){await scanner.stop();await scanner.clear();scanner=null}}catch(e){}$('scannerIdle').classList.remove('hidden');$('scannerLive').classList.add('hidden')}
 async function importFile(f){if(!f)return;try{const ext=f.name.split('.').pop().toLowerCase();if(ext==='csv'){const raw=await f.text(),head=raw.split(/\r?\n/)[0],sep=(head.match(/;/g)||[]).length>(head.match(/,/g)||[]).length?';':',';const lines=raw.split(/\r?\n/).filter(Boolean),headers=lines[0].split(sep).map(x=>x.replace(/^"|"$/g,'').trim());mapRows(lines.slice(1).map(line=>{const vals=line.split(sep).map(x=>x.replace(/^"|"$/g,'').trim());return Object.fromEntries(headers.map((h,i)=>[h,vals[i]??'']))}))}else{const buf=await f.arrayBuffer(),wb=XLSX.read(buf,{type:'array'}),ws=wb.Sheets[wb.SheetNames[0]];mapRows(XLSX.utils.sheet_to_json(ws,{defval:''}))}}catch(e){toast('Datei konnte nicht gelesen werden')}}
@@ -129,12 +205,22 @@ document.querySelectorAll('[data-go]').forEach(b=>b.addEventListener('click',()=
 $('themeBtn').addEventListener('click',()=>{theme=theme==='dark'?'light':'dark';if(theme==='light')document.documentElement.dataset.theme='light';else delete document.documentElement.dataset.theme});
 $('demoBtn').addEventListener('click',demo);$('dashImport').addEventListener('change',e=>importFile(e.target.files[0]));$('inventoryImport').addEventListener('change',e=>importFile(e.target.files[0]));
 $('addLocation').addEventListener('click',()=>{const l=tx($('newLocation').value);if(l&&!locations.includes(l)){locations.push(l);$('newLocation').value='';save();render()}});
-$('findProduct').addEventListener('click',selectProduct);$('searchInput').addEventListener('keydown',e=>{if(e.key==='Enter')selectProduct()});$('plus').addEventListener('click',()=>$('qty').value=num($('qty').value)+1);$('minus').addEventListener('click',()=>$('qty').value=Math.max(0,num($('qty').value)-1));$('saveCount').addEventListener('click',saveCount);
-$('startScanner').addEventListener('click',startScanner);$('stopScanner').addEventListener('click',stopScanner);$('articleSearch').addEventListener('input',()=>{renderArticles();renderSuggestions()});$('exportCsv').addEventListener('click',exportCsv);$('finishInventory').addEventListener('click',finish);
+$('findProduct').addEventListener('click',()=>{const p=find($('searchInput').value);if(!p){toast('Artikel nicht gefunden');return}openScanProduct(p,false)});
+$('searchInput').addEventListener('keydown',e=>{if(e.key==='Enter'){const p=find($('searchInput').value);if(!p){toast('Artikel nicht gefunden');return}openScanProduct(p,false)}});$('plus').addEventListener('click',()=>$('qty').value=num($('qty').value)+1);$('minus').addEventListener('click',()=>$('qty').value=Math.max(0,num($('qty').value)-1));$('saveCount').addEventListener('click',saveCount);
+$('startScanner').addEventListener('click',openFullScanner);$('stopScanner').addEventListener('click',stopScanner);$('articleSearch').addEventListener('input',()=>{renderArticles();renderSuggestions()});$('exportCsv').addEventListener('click',exportCsv);$('finishInventory').addEventListener('click',finish);
 $('resetData').addEventListener('click',()=>{if(confirm('Laufende Inventur wirklich löschen?')){products=[];recent=[];localStorage.removeItem(KEY);render();toast('Inventur gelöscht')}});
 $('closeLocationDetail').addEventListener('click',()=>{$('locationDetail').classList.add('hidden');activeLocationDetail=null});
 $('articleScanBtn').addEventListener('click',startArticleScanner);
 $('articleScanClose').addEventListener('click',stopArticleScanner);
+$('closeFullScanner').addEventListener('click',()=>closeFullScanner());
+$('scannerCancelBtn').addEventListener('click',()=>closeFullScanner());
+$('scannerSwitchBtn').addEventListener('click',switchFullCamera);
+$('scannerFlashBtn').addEventListener('click',toggleTorch);
+$('closeProductDialog').addEventListener('click',()=>{$('scanProductDialog').close();scanProduct=null});
+$('scanPlus').addEventListener('click',()=>$('scanQty').value=num($('scanQty').value)+1);
+$('scanMinus').addEventListener('click',()=>$('scanQty').value=Math.max(0,num($('scanQty').value)-1));
+$('scanSaveContinue').addEventListener('click',()=>saveScanProduct(true));
+$('scanSaveStop').addEventListener('click',()=>saveScanProduct(false));
 document.addEventListener('click',e=>{if(!e.target.closest('.article-search-wrap'))$('searchSuggestions').classList.add('hidden')});
 
 if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js').catch(()=>{}));

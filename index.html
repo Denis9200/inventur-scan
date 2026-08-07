@@ -254,6 +254,65 @@
   </main>
 </div>
 
+
+<div id="fullScannerModal" class="fullscreen-scanner hidden">
+  <div class="scanner-top">
+    <div>
+      <span class="kicker gold">INVENTUR</span>
+      <h2>Barcode scannen</h2>
+    </div>
+    <button id="closeFullScanner" class="round-btn">×</button>
+  </div>
+
+  <div class="scanner-stage">
+    <div id="fullReader"></div>
+    <div class="scan-overlay">
+      <div class="scan-frame"></div>
+      <span>Barcode in den Rahmen halten</span>
+    </div>
+  </div>
+
+  <div class="scanner-bottom">
+    <button class="scanner-tool" id="scannerFlashBtn"><span>⌁</span><small>Taschenlampe</small></button>
+    <button class="scanner-tool scanner-cancel" id="scannerCancelBtn"><span>×</span><small>Abbrechen</small></button>
+    <button class="scanner-tool" id="scannerSwitchBtn"><span>↻</span><small>Kamera wechseln</small></button>
+  </div>
+  <div class="scanner-ready"><i></i> Scanner bereit</div>
+</div>
+
+<dialog id="scanProductDialog" class="product-scan-dialog">
+  <div class="product-scan-body">
+    <div class="product-scan-head">
+      <div>
+        <span class="kicker gold">ARTIKEL GEFUNDEN</span>
+        <h2 id="scanProductName">Artikel</h2>
+        <p id="scanProductBarcode"></p>
+      </div>
+      <button id="closeProductDialog" class="round-btn">×</button>
+    </div>
+
+    <div class="product-summary">
+      <div><span>Sollbestand</span><strong id="scanSoll">0</strong></div>
+      <div><span>Bereits gezählt</span><strong id="scanIst">0</strong></div>
+      <div><span>Differenz</span><strong id="scanDiff">0</strong></div>
+    </div>
+
+    <label class="field">
+      <span>Lagerort</span>
+      <select id="scanLocation"></select>
+    </label>
+
+    <div class="scan-counter">
+      <button id="scanMinus">−</button>
+      <input id="scanQty" type="number" min="0" step="1" value="1" inputmode="numeric">
+      <button id="scanPlus">+</button>
+    </div>
+
+    <button class="btn gold-btn full" id="scanSaveContinue">Speichern & weiter</button>
+    <button class="btn dark-btn full" id="scanSaveStop">Speichern & Scanner beenden</button>
+  </div>
+</dialog>
+
 <div id="toast" class="toast hidden"></div>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://unpkg.com/html5-qrcode"></script>
