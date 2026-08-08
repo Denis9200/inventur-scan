@@ -280,6 +280,12 @@
     <button class="scanner-tool scanner-cancel" id="scannerCancelBtn"><span>×</span><small>Abbrechen</small></button>
     <button class="scanner-tool" id="scannerSwitchBtn"><span>↻</span><small>Kamera wechseln</small></button>
   </div>
+  <div class="ios-fallback">
+    <label class="btn dark-btn" for="barcodePhotoInput">Foto scannen</label>
+    <input id="barcodePhotoInput" type="file" accept="image/*" capture="environment" hidden>
+    <span>Fallback für iPhone/iPad, falls Live-Scan nicht sauber erkennt.</span>
+  </div>
+  <div id="fileScanReader" class="hidden"></div>
   <div class="scanner-ready"><i></i> Scanner bereit</div>
 </div>
 

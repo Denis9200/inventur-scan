@@ -133,3 +133,7 @@ button,input,select{font:inherit}.app-shell{max-width:1500px;margin:auto;display
  .edit-actions{flex-direction:column-reverse;align-items:stretch}
  .edit-actions>div{display:grid;grid-template-columns:1fr 1fr}
 }
+
+.ios-fallback{display:flex;justify-content:center;align-items:center;gap:10px;padding:10px 16px;background:#050505;border-top:1px solid #1d1d1d}
+.ios-fallback span{font-size:11px;color:#777}
+@media(max-width:650px){.ios-fallback{flex-direction:column}.ios-fallback span{text-align:center}}

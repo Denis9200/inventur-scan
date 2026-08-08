@@ -327,14 +327,33 @@ async function openFullScanner(){
    toast('Scanner-Bibliothek nicht geladen');
    return;
  }
+
  $('fullScannerModal').classList.remove('hidden');
+ const isiOS=/iPad|iPhone|iPod/.test(navigator.userAgent) ||
+   (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);
+
+ const constructorConfig={
+   formatsToSupport:[
+     Html5QrcodeSupportedFormats.EAN_13,
+     Html5QrcodeSupportedFormats.EAN_8,
+     Html5QrcodeSupportedFormats.UPC_A,
+     Html5QrcodeSupportedFormats.UPC_E,
+     Html5QrcodeSupportedFormats.CODE_128,
+     Html5QrcodeSupportedFormats.CODE_39,
+     Html5QrcodeSupportedFormats.ITF
+   ],
+   // Safari/iOS hat keinen zuverlässigen BarcodeDetector; dort normaler Decoder.
+   useBarCodeDetectorIfSupported:!isiOS,
+   verbose:false
+ };
 
  const config={
-   fps:15,
+   fps:isiOS?10:15,
    qrbox:(w,h)=>{
-     const width=Math.max(220,Math.floor(w*.88));
-     const height=Math.max(100,Math.min(180,Math.floor(h*.34)));
-     return {width:Math.min(width,w-20),height:Math.min(height,h-20)};
+     const width=Math.min(Math.floor(w*.90),w-16);
+     const desired=isiOS?Math.floor(h*.42):Math.floor(h*.34);
+     const height=Math.min(Math.max(110,desired),190,h-16);
+     return {width:Math.max(200,width),height};
    },
    disableFlip:true
  };
@@ -342,7 +361,7 @@ async function openFullScanner(){
  const onSuccess=async code=>{
    if(!code || code===lastScan)return;
    lastScan=code;
-   setTimeout(()=>lastScan='',1500);
+   setTimeout(()=>lastScan='',1600);
    if(navigator.vibrate)navigator.vibrate(90);
 
    const p=find(code);
@@ -355,86 +374,94 @@ async function openFullScanner(){
  };
 
  try{
-   fullScanner=new Html5Qrcode('fullReader',{
-     formatsToSupport:[
-       Html5QrcodeSupportedFormats.EAN_13,
-       Html5QrcodeSupportedFormats.EAN_8,
-       Html5QrcodeSupportedFormats.UPC_A,
-       Html5QrcodeSupportedFormats.UPC_E,
-       Html5QrcodeSupportedFormats.CODE_128,
-       Html5QrcodeSupportedFormats.CODE_39,
-       Html5QrcodeSupportedFormats.ITF
-     ],
-     useBarCodeDetectorIfSupported:true,
-     verbose:false
-   });
+   fullScanner=new Html5Qrcode('fullReader',constructorConfig);
 
-   // 1) Einfacher, offiziell dokumentierter Start über Rückkamera.
-   try{
-     await fullScanner.start(
-       {facingMode:'environment'},
-       config,
-       onSuccess,
-       ()=>{}
-     );
-     return;
-   }catch(primaryError){
-     console.warn('facingMode start failed',primaryError);
-     try{await fullScanner.clear()}catch(e){}
-     fullScanner=null;
-   }
-
-   // 2) Android-Fallback: Kameras auflisten und eine Rückkamera explizit wählen.
-   const cameras=await Html5Qrcode.getCameras();
-   if(!cameras || !cameras.length)throw new Error('Keine Kamera gefunden');
-
-   const backCamera=
-     cameras.find(c=>/back|rear|environment|rück|hinten/i.test(c.label||'')) ||
-     cameras[cameras.length-1];
-
-   fullScanner=new Html5Qrcode('fullReader',{
-     formatsToSupport:[
-       Html5QrcodeSupportedFormats.EAN_13,
-       Html5QrcodeSupportedFormats.EAN_8,
-       Html5QrcodeSupportedFormats.UPC_A,
-       Html5QrcodeSupportedFormats.UPC_E,
-       Html5QrcodeSupportedFormats.CODE_128,
-       Html5QrcodeSupportedFormats.CODE_39,
-       Html5QrcodeSupportedFormats.ITF
-     ],
-     useBarCodeDetectorIfSupported:true,
-     verbose:false
-   });
-
+   // iPhone/iPad: bewusst nur die einfache, tolerante Rückkamera-Anfrage.
    await fullScanner.start(
-     backCamera.id,
+     {facingMode:'environment'},
      config,
      onSuccess,
      ()=>{}
    );
+ }catch(firstError){
+   console.warn('environment camera failed',firstError);
 
- }catch(e){
-   console.error('Scanner final error',e);
-   try{if(fullScanner)await fullScanner.clear()}catch(_){}
-   fullScanner=null;
-   $('fullScannerModal').classList.add('hidden');
+   // Fallback nur, falls Safari/Browser die Facing-Mode-Auswahl ablehnt.
+   try{
+     try{if(fullScanner)await fullScanner.clear()}catch(_){}
+     fullScanner=null;
 
-   const msg=String(e?.message||e||'unbekannter Fehler');
-   toast('Scannerstart fehlgeschlagen: '+msg.slice(0,70));
+     const cameras=await Html5Qrcode.getCameras();
+     if(!cameras?.length)throw firstError;
+
+     // Auf iOS bevorzugen wir eine als "back" markierte Kamera; sonst letzte Kamera.
+     const rear=cameras.find(c=>/back|rear|environment|rück|hinten/i.test(c.label||'')) || cameras[cameras.length-1];
+     fullScanner=new Html5Qrcode('fullReader',constructorConfig);
+     await fullScanner.start(rear.id,config,onSuccess,()=>{});
+   }catch(e){
+     console.error('iOS scanner error',e);
+     try{if(fullScanner)await fullScanner.clear()}catch(_){}
+     fullScanner=null;
+     $('fullScannerModal').classList.add('hidden');
+     toast('Live-Scanner nicht verfügbar – bitte „Foto scannen“ nutzen');
+   }
  }
 }
+async function scanBarcodePhoto(file){
+ if(!file || typeof Html5Qrcode==='undefined')return;
+ try{
+   // Live-Kamera stoppen, damit iOS nicht zwei Medienpfade gleichzeitig offen hält.
+   await closeFullScanner(false);
+   const decoder=new Html5Qrcode('fileScanReader',{
+     formatsToSupport:[
+       Html5QrcodeSupportedFormats.EAN_13,
+       Html5QrcodeSupportedFormats.EAN_8,
+       Html5QrcodeSupportedFormats.UPC_A,
+       Html5QrcodeSupportedFormats.UPC_E,
+       Html5QrcodeSupportedFormats.CODE_128,
+       Html5QrcodeSupportedFormats.CODE_39,
+       Html5QrcodeSupportedFormats.ITF
+     ],
+     useBarCodeDetectorIfSupported:false,
+     verbose:false
+   });
+   const code=await decoder.scanFile(file,true);
+   try{await decoder.clear()}catch(_){}
+   const p=find(code);
+   if(!p){
+     toast('Barcode '+code+' erkannt – Artikel nicht gefunden');
+     return;
+   }
+   openScanProduct(p,true);
+ }catch(e){
+   console.error('photo scan error',e);
+   toast('Barcode im Foto nicht erkannt');
+ }
+}
+
 async function closeFullScanner(showIdle=true){
  try{if(fullScanner){await fullScanner.stop();await fullScanner.clear();fullScanner=null}}catch(e){}
  $('fullScannerModal').classList.add('hidden');
 }
 
 async function switchFullCamera(){
+ const isiOS=/iPad|iPhone|iPod/.test(navigator.userAgent) ||
+   (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);
+ if(isiOS){
+   toast('Auf iPhone/iPad wird automatisch die Rückkamera verwendet');
+   return;
+ }
  fullFacing=fullFacing==='environment'?'user':'environment';
  await closeFullScanner(false);
  setTimeout(()=>openFullScanner(),180);
 }
-
 async function toggleTorch(){
+ const isiOS=/iPad|iPhone|iPod/.test(navigator.userAgent) ||
+   (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);
+ if(isiOS){
+   toast('Taschenlampe ist im Safari-Webscanner nicht zuverlässig verfügbar');
+   return;
+ }
  try{
    if(!fullScanner){toast('Scanner ist nicht aktiv');return}
    const caps=fullScanner.getRunningTrackCapabilities?.();
@@ -466,6 +493,7 @@ $('closeFullScanner').addEventListener('click',()=>closeFullScanner());
 $('scannerCancelBtn').addEventListener('click',()=>closeFullScanner());
 $('scannerSwitchBtn').addEventListener('click',switchFullCamera);
 $('scannerFlashBtn').addEventListener('click',toggleTorch);
+$('barcodePhotoInput').addEventListener('change',e=>{const f=e.target.files?.[0];if(f)scanBarcodePhoto(f);e.target.value=''});
 $('closeProductDialog').addEventListener('click',()=>{$('scanProductDialog').close();scanProduct=null});
 $('scanPlus').addEventListener('click',()=>$('scanQty').value=num($('scanQty').value)+1);
 $('scanMinus').addEventListener('click',()=>$('scanQty').value=Math.max(0,num($('scanQty').value)-1));
