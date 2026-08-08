@@ -1,21 +1,5 @@
-# Inventur Scan V5 – Schritt 3
-
-Neu:
-- Artikel können überall geöffnet und bearbeitet werden
-- Artikelliste: Artikel anklicken
-- Inventurstatus: Artikel anklicken
-- Lagerort-Detail: Artikel anklicken
-- Bestellvorschläge: Artikel anklicken
-- Scan-Produktfenster: Button „Artikel bearbeiten“
-
-Bearbeitbar:
-- Artikelname
-- Barcode
-- Sollbestand
-- Mindestbestand
-- Einkaufspreis
-- Verkaufspreis
-- gezählte Menge für jeden Lagerort
-- Artikel kann gelöscht werden
-
-Alle Dashboard-, Lagerort-, Such- und Auswertungswerte aktualisieren sich danach automatisch.
+# Scanner-Fix
+Der Inventur-Scanner ist jetzt gezielt für EAN-13, EAN-8, UPC-A/UPC-E, Code 128, Code 39 und ITF konfiguriert.
+Der Scanbereich ist breiter und flacher, die Scanrate höher und unterstützte Geräte nutzen nativen BarcodeDetector, Autofokus und leichten Zoom.
+Wenn ein Barcode erkannt wird, aber nicht im Bestand existiert, wird die erkannte Nummer angezeigt.
+Nach dem GitHub-Upload Chrome bzw. die installierte PWA einmal vollständig schließen und neu öffnen.

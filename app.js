@@ -43,8 +43,44 @@ function attachEditHandlers(){
  });
 }
 
+
+function openNewArticle(){
+ const p={
+   id:crypto.randomUUID?crypto.randomUUID():String(Date.now()),
+   name:'',
+   barcode:'',
+   expected:0,
+   buy:0,
+   sell:0,
+   min:0,
+   counts:{}
+ };
+ locations.forEach(loc=>p.counts[loc]=0);
+ editProduct=p;
+
+ $('epTitle').textContent='Neuer Artikel';
+ $('epName').value='';
+ $('epBarcode').value='';
+ $('epExpected').value=0;
+ $('epMin').value=0;
+ $('epBuy').value=0;
+ $('epSell').value=0;
+
+ $('epLocations').innerHTML=locations.map(loc=>`
+   <label class="edit-location-row">
+     <strong>${esc(loc)}</strong>
+     <input type="number" min="0" step="1" value="0" data-ep-location="${esc(loc)}">
+   </label>
+ `).join('');
+
+ updateEditSummary();
+ $('epLocations').querySelectorAll('input[data-ep-location]').forEach(i=>i.addEventListener('input',updateEditSummary));
+ $('editProductDialog').dataset.mode='new';
+ $('editProductDialog').showModal();
+}
 function openEditProduct(p){
  editProduct=p;
+ $('editProductDialog').dataset.mode='edit';
  $('epTitle').textContent=p.name;
  $('epName').value=p.name;
  $('epBarcode').value=p.barcode||'';
@@ -81,6 +117,7 @@ function updateEditSummary(){
 
 function saveEditProduct(){
  if(!editProduct)return;
+ const isNew=$('editProductDialog').dataset.mode==='new';
  const name=tx($('epName').value);
  if(!name){toast('Artikelname darf nicht leer sein');return}
  editProduct.name=name;
@@ -92,13 +129,20 @@ function saveEditProduct(){
  editProduct.counts=editProduct.counts||{};
  locations.forEach(loc=>editProduct.counts[loc]=0);
  $('epLocations').querySelectorAll('input[data-ep-location]').forEach(i=>editProduct.counts[i.dataset.epLocation]=Math.max(0,num(i.value)));
+ if(isNew)products.push(editProduct);
  $('editProductDialog').close();
+ $('editProductDialog').dataset.mode='edit';
  editProduct=null;
- save();render();toast('Artikel aktualisiert');
+ save();render();toast(isNew?'Artikel angelegt':'Artikel aktualisiert');
 }
 
 function deleteEditProduct(){
  if(!editProduct)return;
+ if($('editProductDialog').dataset.mode==='new'){
+   $('editProductDialog').close();
+   editProduct=null;
+   return;
+ }
  if(!confirm(`Artikel "${editProduct.name}" wirklich löschen?`))return;
  products=products.filter(p=>String(p.id)!==String(editProduct.id));
  $('editProductDialog').close();
@@ -137,17 +181,29 @@ async function startArticleScanner(){
  if(typeof Html5Qrcode==='undefined'){toast('Scanner konnte nicht geladen werden');return}
  $('articleScannerModal').classList.remove('hidden');
  try{
-   articleScanner=new Html5Qrcode('articleReader');
-   await articleScanner.start({facingMode:'environment'},{fps:12,qrbox:{width:280,height:160}},async code=>{
-     const p=find(code);
-     if(!p){toast('Barcode nicht im Bestand gefunden');return}
-     $('articleSearch').value=p.name;
-     await stopArticleScanner();
-     renderArticles();
-     toast(p.name);
-     setTimeout(()=>document.querySelector(`[data-product-id="${CSS.escape(String(p.id))}"]`)?.scrollIntoView({behavior:'smooth',block:'center'}),80);
+   articleScanner=new Html5Qrcode('articleReader',{
+     formatsToSupport:[
+       Html5QrcodeSupportedFormats.EAN_13,
+       Html5QrcodeSupportedFormats.EAN_8,
+       Html5QrcodeSupportedFormats.UPC_A,
+       Html5QrcodeSupportedFormats.UPC_E,
+       Html5QrcodeSupportedFormats.CODE_128,
+       Html5QrcodeSupportedFormats.CODE_39,
+       Html5QrcodeSupportedFormats.ITF
+     ],verbose:false
    });
- }catch(e){toast('Kamera konnte nicht gestartet werden');$('articleScannerModal').classList.add('hidden')}
+   await articleScanner.start(
+     {facingMode:{ideal:'environment'}},
+     {fps:20,qrbox:(w,h)=>({width:Math.floor(w*.90),height:Math.max(100,Math.floor(h*.32))}),disableFlip:true,experimentalFeatures:{useBarCodeDetectorIfSupported:true}},
+     async code=>{
+       const p=find(code);
+       if(!p){toast('Barcode '+code+' erkannt – nicht im Bestand');return}
+       if(navigator.vibrate)navigator.vibrate(90);
+       $('articleSearch').value=p.name;
+       await stopArticleScanner();renderArticles();toast(p.name);
+     },()=>{}
+   );
+ }catch(e){console.error(e);toast('Kamera konnte nicht gestartet werden');$('articleScannerModal').classList.add('hidden')}
 }
 async function stopArticleScanner(){
  try{if(articleScanner){await articleScanner.stop();await articleScanner.clear();articleScanner=null}}catch(e){}
@@ -230,24 +286,53 @@ function saveScanProduct(restart){
 }
 
 async function openFullScanner(){
- if(typeof Html5Qrcode==='undefined'){toast('Scanner konnte nicht geladen werden');return}
+ if(typeof Html5Qrcode==='undefined'){toast('Scanner-Bibliothek konnte nicht geladen werden');return}
  $('fullScannerModal').classList.remove('hidden');
  try{
-   fullScanner=new Html5Qrcode('fullReader');
-   await fullScanner.start({facingMode:fullFacing},{fps:14,qrbox:{width:300,height:180}},async code=>{
-      if(code===lastScan)return;
-      lastScan=code;setTimeout(()=>lastScan='',1300);
-      const p=find(code);
-      if(!p){toast('Barcode nicht im Bestand gefunden');return}
-      await closeFullScanner(false);
-      openScanProduct(p,true);
+   fullScanner=new Html5Qrcode('fullReader',{
+     formatsToSupport:[
+       Html5QrcodeSupportedFormats.EAN_13,
+       Html5QrcodeSupportedFormats.EAN_8,
+       Html5QrcodeSupportedFormats.UPC_A,
+       Html5QrcodeSupportedFormats.UPC_E,
+       Html5QrcodeSupportedFormats.CODE_128,
+       Html5QrcodeSupportedFormats.CODE_39,
+       Html5QrcodeSupportedFormats.ITF
+     ],verbose:false
    });
+   await fullScanner.start(
+     {facingMode:{ideal:fullFacing}},
+     {
+       fps:20,
+       qrbox:(w,h)=>({width:Math.floor(w*.90),height:Math.max(120,Math.floor(h*.30))}),
+       disableFlip:true,
+       experimentalFeatures:{useBarCodeDetectorIfSupported:true}
+     },
+     async code=>{
+       if(!code||code===lastScan)return;
+       lastScan=code;setTimeout(()=>lastScan='',1800);
+       if(navigator.vibrate)navigator.vibrate(90);
+       const p=find(code);
+       if(!p){toast('Barcode '+code+' erkannt – Artikel nicht gefunden');return}
+       await closeFullScanner(false);
+       openScanProduct(p,true);
+     },()=>{}
+   );
+   try{
+     const caps=fullScanner.getRunningTrackCapabilities?.(),advanced=[];
+     if(caps?.focusMode?.includes?.('continuous'))advanced.push({focusMode:'continuous'});
+     if(caps?.zoom){
+       const target=Math.min(caps.zoom.max||1.25,Math.max(caps.zoom.min||1,1.25));
+       advanced.push({zoom:target});
+     }
+     if(advanced.length)await fullScanner.applyVideoConstraints({advanced});
+   }catch(e){}
  }catch(e){
-   toast('Kamera konnte nicht gestartet werden');
+   console.error(e);
+   toast('Scanner konnte nicht gestartet werden');
    $('fullScannerModal').classList.add('hidden');
  }
 }
-
 async function closeFullScanner(showIdle=true){
  try{if(fullScanner){await fullScanner.stop();await fullScanner.clear();fullScanner=null}}catch(e){}
  $('fullScannerModal').classList.add('hidden');
@@ -281,7 +366,8 @@ $('demoBtn').addEventListener('click',demo);$('dashImport').addEventListener('ch
 $('addLocation').addEventListener('click',()=>{const l=tx($('newLocation').value);if(l&&!locations.includes(l)){locations.push(l);$('newLocation').value='';save();render()}});
 $('findProduct').addEventListener('click',()=>{const p=find($('searchInput').value);if(!p){toast('Artikel nicht gefunden');return}openScanProduct(p,false)});
 $('searchInput').addEventListener('keydown',e=>{if(e.key==='Enter'){const p=find($('searchInput').value);if(!p){toast('Artikel nicht gefunden');return}openScanProduct(p,false)}});$('plus').addEventListener('click',()=>$('qty').value=num($('qty').value)+1);$('minus').addEventListener('click',()=>$('qty').value=Math.max(0,num($('qty').value)-1));$('saveCount').addEventListener('click',saveCount);
-$('startScanner').addEventListener('click',openFullScanner);$('stopScanner').addEventListener('click',stopScanner);$('articleSearch').addEventListener('input',()=>{renderArticles();renderSuggestions()});$('exportCsv').addEventListener('click',exportCsv);$('finishInventory').addEventListener('click',finish);
+$('startScanner').addEventListener('click',openFullScanner);$('stopScanner').addEventListener('click',stopScanner);$('articleSearch').addEventListener('input',()=>{renderArticles();renderSuggestions()});$('newArticleBtn').addEventListener('click',openNewArticle);
+$('exportCsv').addEventListener('click',exportCsv);$('finishInventory').addEventListener('click',finish);
 $('resetData').addEventListener('click',()=>{if(confirm('Laufende Inventur wirklich löschen?')){products=[];recent=[];localStorage.removeItem(KEY);render();toast('Inventur gelöscht')}});
 $('closeLocationDetail').addEventListener('click',()=>{$('locationDetail').classList.add('hidden');activeLocationDetail=null});
 $('articleScanBtn').addEventListener('click',startArticleScanner);

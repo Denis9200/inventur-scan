@@ -181,7 +181,10 @@
       <div class="content-card">
         <div class="section-head">
           <div><span class="kicker gold">ARTIKEL</span><h2>Lagerbestand</h2></div>
-          <button class="btn dark-btn" id="exportCsv">CSV exportieren</button>
+          <div class="welcome-actions">
+            <button class="btn gold-btn" id="newArticleBtn">+ Neuer Artikel</button>
+            <button class="btn dark-btn" id="exportCsv">CSV exportieren</button>
+          </div>
         </div>
 
         <div class="article-search-wrap">
@@ -380,7 +383,7 @@
 
 <div id="toast" class="toast hidden"></div>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-<script src="https://unpkg.com/html5-qrcode"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script src="./app.js"></script>
 </body>
 </html>
