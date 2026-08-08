@@ -178,8 +178,28 @@ function renderSuggestions(){
  }));
 }
 async function startArticleScanner(){
- if(typeof Html5Qrcode==='undefined'){toast('Scanner konnte nicht geladen werden');return}
+ if(typeof Html5Qrcode==='undefined'){toast('Scanner nicht geladen');return}
  $('articleScannerModal').classList.remove('hidden');
+
+ const config={
+   fps:15,
+   qrbox:(w,h)=>({
+     width:Math.min(Math.max(220,Math.floor(w*.88)),w-20),
+     height:Math.min(Math.max(100,Math.floor(h*.34)),160,h-20)
+   }),
+   disableFlip:true
+ };
+
+ const onSuccess=async code=>{
+   const p=find(code);
+   if(!p){toast('Barcode '+code+' erkannt – nicht im Bestand');return}
+   if(navigator.vibrate)navigator.vibrate(90);
+   $('articleSearch').value=p.name;
+   await stopArticleScanner();
+   renderArticles();
+   toast(p.name);
+ };
+
  try{
    articleScanner=new Html5Qrcode('articleReader',{
      formatsToSupport:[
@@ -190,20 +210,37 @@ async function startArticleScanner(){
        Html5QrcodeSupportedFormats.CODE_128,
        Html5QrcodeSupportedFormats.CODE_39,
        Html5QrcodeSupportedFormats.ITF
-     ],verbose:false
+     ],
+     useBarCodeDetectorIfSupported:true,
+     verbose:false
    });
-   await articleScanner.start(
-     {facingMode:{ideal:'environment'}},
-     {fps:20,qrbox:(w,h)=>({width:Math.floor(w*.90),height:Math.max(100,Math.floor(h*.32))}),disableFlip:true,experimentalFeatures:{useBarCodeDetectorIfSupported:true}},
-     async code=>{
-       const p=find(code);
-       if(!p){toast('Barcode '+code+' erkannt – nicht im Bestand');return}
-       if(navigator.vibrate)navigator.vibrate(90);
-       $('articleSearch').value=p.name;
-       await stopArticleScanner();renderArticles();toast(p.name);
-     },()=>{}
-   );
- }catch(e){console.error(e);toast('Kamera konnte nicht gestartet werden');$('articleScannerModal').classList.add('hidden')}
+   await articleScanner.start({facingMode:'environment'},config,onSuccess,()=>{});
+ }catch(first){
+   try{if(articleScanner)await articleScanner.clear()}catch(_){}
+   articleScanner=null;
+   try{
+     const cams=await Html5Qrcode.getCameras();
+     const cam=cams.find(c=>/back|rear|environment|rück|hinten/i.test(c.label||''))||cams[cams.length-1];
+     articleScanner=new Html5Qrcode('articleReader',{
+       formatsToSupport:[
+         Html5QrcodeSupportedFormats.EAN_13,
+         Html5QrcodeSupportedFormats.EAN_8,
+         Html5QrcodeSupportedFormats.UPC_A,
+         Html5QrcodeSupportedFormats.UPC_E,
+         Html5QrcodeSupportedFormats.CODE_128,
+         Html5QrcodeSupportedFormats.CODE_39,
+         Html5QrcodeSupportedFormats.ITF
+       ],
+       useBarCodeDetectorIfSupported:true,
+       verbose:false
+     });
+     await articleScanner.start(cam.id,config,onSuccess,()=>{});
+   }catch(e){
+     console.error(e);
+     $('articleScannerModal').classList.add('hidden');
+     toast('Scannerstart fehlgeschlagen');
+   }
+ }
 }
 async function stopArticleScanner(){
  try{if(articleScanner){await articleScanner.stop();await articleScanner.clear();articleScanner=null}}catch(e){}
@@ -286,8 +323,37 @@ function saveScanProduct(restart){
 }
 
 async function openFullScanner(){
- if(typeof Html5Qrcode==='undefined'){toast('Scanner-Bibliothek konnte nicht geladen werden');return}
+ if(typeof Html5Qrcode==='undefined'){
+   toast('Scanner-Bibliothek nicht geladen');
+   return;
+ }
  $('fullScannerModal').classList.remove('hidden');
+
+ const config={
+   fps:15,
+   qrbox:(w,h)=>{
+     const width=Math.max(220,Math.floor(w*.88));
+     const height=Math.max(100,Math.min(180,Math.floor(h*.34)));
+     return {width:Math.min(width,w-20),height:Math.min(height,h-20)};
+   },
+   disableFlip:true
+ };
+
+ const onSuccess=async code=>{
+   if(!code || code===lastScan)return;
+   lastScan=code;
+   setTimeout(()=>lastScan='',1500);
+   if(navigator.vibrate)navigator.vibrate(90);
+
+   const p=find(code);
+   if(!p){
+     toast('Barcode '+code+' erkannt – Artikel nicht gefunden');
+     return;
+   }
+   await closeFullScanner(false);
+   openScanProduct(p,true);
+ };
+
  try{
    fullScanner=new Html5Qrcode('fullReader',{
      formatsToSupport:[
@@ -298,39 +364,63 @@ async function openFullScanner(){
        Html5QrcodeSupportedFormats.CODE_128,
        Html5QrcodeSupportedFormats.CODE_39,
        Html5QrcodeSupportedFormats.ITF
-     ],verbose:false
+     ],
+     useBarCodeDetectorIfSupported:true,
+     verbose:false
    });
-   await fullScanner.start(
-     {facingMode:{ideal:fullFacing}},
-     {
-       fps:20,
-       qrbox:(w,h)=>({width:Math.floor(w*.90),height:Math.max(120,Math.floor(h*.30))}),
-       disableFlip:true,
-       experimentalFeatures:{useBarCodeDetectorIfSupported:true}
-     },
-     async code=>{
-       if(!code||code===lastScan)return;
-       lastScan=code;setTimeout(()=>lastScan='',1800);
-       if(navigator.vibrate)navigator.vibrate(90);
-       const p=find(code);
-       if(!p){toast('Barcode '+code+' erkannt – Artikel nicht gefunden');return}
-       await closeFullScanner(false);
-       openScanProduct(p,true);
-     },()=>{}
-   );
+
+   // 1) Einfacher, offiziell dokumentierter Start über Rückkamera.
    try{
-     const caps=fullScanner.getRunningTrackCapabilities?.(),advanced=[];
-     if(caps?.focusMode?.includes?.('continuous'))advanced.push({focusMode:'continuous'});
-     if(caps?.zoom){
-       const target=Math.min(caps.zoom.max||1.25,Math.max(caps.zoom.min||1,1.25));
-       advanced.push({zoom:target});
-     }
-     if(advanced.length)await fullScanner.applyVideoConstraints({advanced});
-   }catch(e){}
+     await fullScanner.start(
+       {facingMode:'environment'},
+       config,
+       onSuccess,
+       ()=>{}
+     );
+     return;
+   }catch(primaryError){
+     console.warn('facingMode start failed',primaryError);
+     try{await fullScanner.clear()}catch(e){}
+     fullScanner=null;
+   }
+
+   // 2) Android-Fallback: Kameras auflisten und eine Rückkamera explizit wählen.
+   const cameras=await Html5Qrcode.getCameras();
+   if(!cameras || !cameras.length)throw new Error('Keine Kamera gefunden');
+
+   const backCamera=
+     cameras.find(c=>/back|rear|environment|rück|hinten/i.test(c.label||'')) ||
+     cameras[cameras.length-1];
+
+   fullScanner=new Html5Qrcode('fullReader',{
+     formatsToSupport:[
+       Html5QrcodeSupportedFormats.EAN_13,
+       Html5QrcodeSupportedFormats.EAN_8,
+       Html5QrcodeSupportedFormats.UPC_A,
+       Html5QrcodeSupportedFormats.UPC_E,
+       Html5QrcodeSupportedFormats.CODE_128,
+       Html5QrcodeSupportedFormats.CODE_39,
+       Html5QrcodeSupportedFormats.ITF
+     ],
+     useBarCodeDetectorIfSupported:true,
+     verbose:false
+   });
+
+   await fullScanner.start(
+     backCamera.id,
+     config,
+     onSuccess,
+     ()=>{}
+   );
+
  }catch(e){
-   console.error(e);
-   toast('Scanner konnte nicht gestartet werden');
+   console.error('Scanner final error',e);
+   try{if(fullScanner)await fullScanner.clear()}catch(_){}
+   fullScanner=null;
    $('fullScannerModal').classList.add('hidden');
+
+   const msg=String(e?.message||e||'unbekannter Fehler');
+   toast('Scannerstart fehlgeschlagen: '+msg.slice(0,70));
  }
 }
 async function closeFullScanner(showIdle=true){
