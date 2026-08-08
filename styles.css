@@ -145,3 +145,12 @@ button,input,select{font:inherit}.app-shell{max-width:1500px;margin:auto;display
   position:absolute;inset:0;width:100%!important;height:100%!important;object-fit:cover
 }
 .scan-frame.detected{border-color:#62d64c;box-shadow:0 0 0 9999px rgba(0,0,0,.12),0 0 24px rgba(98,214,76,.35)}
+
+.unknown-barcode-dialog{border:0;padding:0;border-radius:22px;background:#080808;color:#fff;max-width:500px;width:calc(100% - 24px);box-shadow:0 30px 100px rgba(0,0,0,.75)}
+.unknown-barcode-dialog::backdrop{background:rgba(0,0,0,.78);backdrop-filter:blur(6px)}
+.unknown-barcode-body{padding:24px;border:1px solid #5a4517;border-radius:22px;text-align:center}
+.unknown-barcode-body h2{margin:8px 0}.unknown-barcode-body p{color:#aaa;line-height:1.5}
+.unknown-barcode-body p strong{color:var(--gold2);font-size:17px;word-break:break-all}
+.unknown-icon{width:58px;height:58px;border-radius:50%;display:grid;place-items:center;margin:0 auto 14px;background:#18130a;border:1px solid #6c531c;color:var(--gold2);font-size:30px;font-weight:900}
+.unknown-actions{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:20px}
+@media(max-width:520px){.unknown-actions{grid-template-columns:1fr}}

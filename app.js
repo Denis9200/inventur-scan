@@ -1,7 +1,7 @@
 
 const $=id=>document.getElementById(id);
 const KEY='dj_inventur_v5_step1', HIST='dj_inventur_history_v5';
-let products=[],locations=['Salon','Keller'],recent=[],current=null,scanner=null,articleScanner=null,fullScanner=null,lastScan='',theme='dark',activeLocationDetail=null,scanProduct=null,scanRestartAfterSave=false,fullFacing='environment',editProduct=null,quaggaActive=false,scanConfirming=false;
+let products=[],locations=['Salon','Keller'],recent=[],current=null,scanner=null,articleScanner=null,fullScanner=null,lastScan='',theme='dark',activeLocationDetail=null,scanProduct=null,scanRestartAfterSave=false,fullFacing='environment',editProduct=null,quaggaActive=false,scanConfirming=false,pendingUnknownBarcode='';
 
 const num=v=>{const x=Number(String(v??'').replace(',','.'));return Number.isFinite(x)?x:0};
 const tx=v=>String(v??'').trim();
@@ -324,6 +324,26 @@ async function openFullScanner(){
 }
 
 
+
+function askCreateUnknownBarcode(code){
+ pendingUnknownBarcode=normalizeBarcode(code);
+ $('unknownBarcodeValue').textContent=pendingUnknownBarcode;
+ if(!$('unknownBarcodeDialog').open)$('unknownBarcodeDialog').showModal();
+}
+function continueAfterUnknown(){
+ $('unknownBarcodeDialog').close();
+ pendingUnknownBarcode='';
+ setTimeout(()=>openFullScanner(),220);
+}
+function createFromUnknownBarcode(){
+ const code=pendingUnknownBarcode;
+ $('unknownBarcodeDialog').close();
+ pendingUnknownBarcode='';
+ openNewArticle();
+ $('epBarcode').value=code;
+ $('epName').focus();
+ toast('Barcode übernommen – Artikeldaten ergänzen');
+}
 function normalizeBarcode(v){
  return String(v||'').trim().replace(/\s+/g,'');
 }
@@ -397,9 +417,7 @@ async function confirmBarcodeFromFrame(firstCode){
      if(navigator.vibrate)navigator.vibrate([70,40,70]);
      openScanProduct(p,true);
    }else{
-     toast('Barcode '+confirmed+' erkannt – Artikel nicht gefunden');
-     // Keep the result visible, then return to scanner automatically.
-     setTimeout(()=>openFullScanner(),1100);
+     askCreateUnknownBarcode(confirmed);
    }
  }catch(e){
    console.error('scan confirmation error',e);
@@ -483,6 +501,8 @@ $('addLocation').addEventListener('click',()=>{const l=tx($('newLocation').value
 $('findProduct').addEventListener('click',()=>{const p=find($('searchInput').value);if(!p){toast('Artikel nicht gefunden');return}openScanProduct(p,false)});
 $('searchInput').addEventListener('keydown',e=>{if(e.key==='Enter'){const p=find($('searchInput').value);if(!p){toast('Artikel nicht gefunden');return}openScanProduct(p,false)}});$('plus').addEventListener('click',()=>$('qty').value=num($('qty').value)+1);$('minus').addEventListener('click',()=>$('qty').value=Math.max(0,num($('qty').value)-1));$('saveCount').addEventListener('click',saveCount);
 $('startScanner').addEventListener('click',openFullScanner);$('stopScanner').addEventListener('click',stopScanner);$('articleSearch').addEventListener('input',()=>{renderArticles();renderSuggestions()});$('newArticleBtn').addEventListener('click',openNewArticle);
+$('unknownNo').addEventListener('click',continueAfterUnknown);
+$('unknownYes').addEventListener('click',createFromUnknownBarcode);
 $('exportCsv').addEventListener('click',exportCsv);$('finishInventory').addEventListener('click',finish);
 $('resetData').addEventListener('click',()=>{if(confirm('Laufende Inventur wirklich löschen?')){products=[];recent=[];localStorage.removeItem(KEY);render();toast('Inventur gelöscht')}});
 $('closeLocationDetail').addEventListener('click',()=>{$('locationDetail').classList.add('hidden');activeLocationDetail=null});

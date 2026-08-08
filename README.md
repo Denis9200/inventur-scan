@@ -1,17 +1,14 @@
-# Inventur Scan V5 – Step 7: Scan bestätigen
+# Inventur Scan V5 – Step 8
 
-Der Live-Scanner arbeitet jetzt zweistufig:
+Neu bei unbekannten Barcodes:
 
-1. Quagga erkennt im Kamerastream einen Barcode → Rahmen wird grün.
-2. Genau in diesem Moment wird das aktuelle Kamerabild intern eingefroren/aufgenommen.
-3. Dieses Bild wird ein zweites Mal mit mehreren 1D-Decodern ausgewertet.
-4. Danach wird der Barcode gegen den Artikelbestand geprüft.
-5. Bei Treffer öffnet sich automatisch das besprochene Produktfenster.
-6. Bei unbekanntem Barcode wird die gelesene Nummer angezeigt und der Scanner startet erneut.
-
-Zusätzlich:
-- toleranter Abgleich zwischen UPC-A und EAN-13 mit führender Null
-- Schutz vor mehrfachen Popups beim selben Scan
-- funktioniert weiterhin auf iPhone/iPad und Android
+1. Barcode wird erkannt und bestätigt.
+2. Wenn kein vorhandener Artikel dazu gefunden wird, öffnet sich ein Dialog:
+   „Artikel nicht gefunden – möchtest du diesen Artikel jetzt neu anlegen?“
+3. „Nein, weiter scannen“ startet den Scanner erneut.
+4. „Ja, Artikel anlegen“ öffnet direkt die vorhandene Maske „Neuer Artikel“.
+5. Der gescannte Barcode ist bereits automatisch eingetragen.
+6. Danach müssen nur noch Artikelname, EK, VK, Soll-/Mindestbestand und Lagerort/Menge ergänzt werden.
+7. Nach dem Speichern ist der Artikel sofort im Bestand und beim nächsten Scan bekannt.
 
 Nach GitHub-Upload die PWA vollständig schließen und neu öffnen.
