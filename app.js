@@ -1,7 +1,7 @@
 
 const $=id=>document.getElementById(id);
 const KEY='dj_inventur_v5_step1', HIST='dj_inventur_history_v5';
-let products=[],locations=['Salon','Keller'],recent=[],current=null,scanner=null,articleScanner=null,fullScanner=null,lastScan='',theme='dark',activeLocationDetail=null,scanProduct=null,scanRestartAfterSave=false,fullFacing='environment',editProduct=null;
+let products=[],locations=['Salon','Keller'],recent=[],current=null,scanner=null,articleScanner=null,fullScanner=null,lastScan='',theme='dark',activeLocationDetail=null,scanProduct=null,scanRestartAfterSave=false,fullFacing='environment',editProduct=null,quaggaActive=false;
 
 const num=v=>{const x=Number(String(v??'').replace(',','.'));return Number.isFinite(x)?x:0};
 const tx=v=>String(v??'').trim();
@@ -178,69 +178,8 @@ function renderSuggestions(){
  }));
 }
 async function startArticleScanner(){
- if(typeof Html5Qrcode==='undefined'){toast('Scanner nicht geladen');return}
- $('articleScannerModal').classList.remove('hidden');
-
- const config={
-   fps:15,
-   qrbox:(w,h)=>({
-     width:Math.min(Math.max(220,Math.floor(w*.88)),w-20),
-     height:Math.min(Math.max(100,Math.floor(h*.34)),160,h-20)
-   }),
-   disableFlip:true
- };
-
- const onSuccess=async code=>{
-   const p=find(code);
-   if(!p){toast('Barcode '+code+' erkannt – nicht im Bestand');return}
-   if(navigator.vibrate)navigator.vibrate(90);
-   $('articleSearch').value=p.name;
-   await stopArticleScanner();
-   renderArticles();
-   toast(p.name);
- };
-
- try{
-   articleScanner=new Html5Qrcode('articleReader',{
-     formatsToSupport:[
-       Html5QrcodeSupportedFormats.EAN_13,
-       Html5QrcodeSupportedFormats.EAN_8,
-       Html5QrcodeSupportedFormats.UPC_A,
-       Html5QrcodeSupportedFormats.UPC_E,
-       Html5QrcodeSupportedFormats.CODE_128,
-       Html5QrcodeSupportedFormats.CODE_39,
-       Html5QrcodeSupportedFormats.ITF
-     ],
-     useBarCodeDetectorIfSupported:true,
-     verbose:false
-   });
-   await articleScanner.start({facingMode:'environment'},config,onSuccess,()=>{});
- }catch(first){
-   try{if(articleScanner)await articleScanner.clear()}catch(_){}
-   articleScanner=null;
-   try{
-     const cams=await Html5Qrcode.getCameras();
-     const cam=cams.find(c=>/back|rear|environment|rück|hinten/i.test(c.label||''))||cams[cams.length-1];
-     articleScanner=new Html5Qrcode('articleReader',{
-       formatsToSupport:[
-         Html5QrcodeSupportedFormats.EAN_13,
-         Html5QrcodeSupportedFormats.EAN_8,
-         Html5QrcodeSupportedFormats.UPC_A,
-         Html5QrcodeSupportedFormats.UPC_E,
-         Html5QrcodeSupportedFormats.CODE_128,
-         Html5QrcodeSupportedFormats.CODE_39,
-         Html5QrcodeSupportedFormats.ITF
-       ],
-       useBarCodeDetectorIfSupported:true,
-       verbose:false
-     });
-     await articleScanner.start(cam.id,config,onSuccess,()=>{});
-   }catch(e){
-     console.error(e);
-     $('articleScannerModal').classList.add('hidden');
-     toast('Scannerstart fehlgeschlagen');
-   }
- }
+ // Für die Artikelsuche verwenden wir denselben robusten Vollbild-Scanner.
+ await openFullScanner();
 }
 async function stopArticleScanner(){
  try{if(articleScanner){await articleScanner.stop();await articleScanner.clear();articleScanner=null}}catch(e){}
@@ -323,135 +262,113 @@ function saveScanProduct(restart){
 }
 
 async function openFullScanner(){
- if(typeof Html5Qrcode==='undefined'){
-   toast('Scanner-Bibliothek nicht geladen');
+ if(typeof Quagga==='undefined'){
+   toast('Barcode-Scanner konnte nicht geladen werden');
    return;
  }
 
  $('fullScannerModal').classList.remove('hidden');
+
  const isiOS=/iPad|iPhone|iPod/.test(navigator.userAgent) ||
    (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);
 
- const constructorConfig={
-   formatsToSupport:[
-     Html5QrcodeSupportedFormats.EAN_13,
-     Html5QrcodeSupportedFormats.EAN_8,
-     Html5QrcodeSupportedFormats.UPC_A,
-     Html5QrcodeSupportedFormats.UPC_E,
-     Html5QrcodeSupportedFormats.CODE_128,
-     Html5QrcodeSupportedFormats.CODE_39,
-     Html5QrcodeSupportedFormats.ITF
-   ],
-   // Safari/iOS hat keinen zuverlässigen BarcodeDetector; dort normaler Decoder.
-   useBarCodeDetectorIfSupported:!isiOS,
-   verbose:false
- };
-
- const config={
-   fps:isiOS?10:15,
-   qrbox:(w,h)=>{
-     const width=Math.min(Math.floor(w*.90),w-16);
-     const desired=isiOS?Math.floor(h*.42):Math.floor(h*.34);
-     const height=Math.min(Math.max(110,desired),190,h-16);
-     return {width:Math.max(200,width),height};
-   },
-   disableFlip:true
- };
-
- const onSuccess=async code=>{
-   if(!code || code===lastScan)return;
-   lastScan=code;
-   setTimeout(()=>lastScan='',1600);
-   if(navigator.vibrate)navigator.vibrate(90);
-
-   const p=find(code);
-   if(!p){
-     toast('Barcode '+code+' erkannt – Artikel nicht gefunden');
-     return;
-   }
-   await closeFullScanner(false);
-   openScanProduct(p,true);
- };
+ const readers=[
+   'ean_reader',
+   'ean_8_reader',
+   'upc_reader',
+   'upc_e_reader',
+   'code_128_reader',
+   'code_39_reader',
+   'i2of5_reader'
+ ];
 
  try{
-   fullScanner=new Html5Qrcode('fullReader',constructorConfig);
+   await new Promise((resolve,reject)=>{
+     Quagga.init({
+       inputStream:{
+         type:'LiveStream',
+         target:$('quaggaReader'),
+         constraints:{
+           facingMode:'environment',
+           width:{ideal:isiOS?1920:1280},
+           height:{ideal:isiOS?1080:720},
+           aspectRatio:{ideal:1.7777778}
+         },
+         area:{top:'20%',right:'5%',left:'5%',bottom:'20%'}
+       },
+       locator:{
+         patchSize:isiOS?'medium':'medium',
+         halfSample:!isiOS
+       },
+       numOfWorkers:isiOS?0:Math.min(4,navigator.hardwareConcurrency||2),
+       frequency:isiOS?10:14,
+       decoder:{
+         readers,
+         multiple:false
+       },
+       locate:true
+     },err=>err?reject(err):resolve());
+   });
 
-   // iPhone/iPad: bewusst nur die einfache, tolerante Rückkamera-Anfrage.
-   await fullScanner.start(
-     {facingMode:'environment'},
-     config,
-     onSuccess,
-     ()=>{}
-   );
- }catch(firstError){
-   console.warn('environment camera failed',firstError);
-
-   // Fallback nur, falls Safari/Browser die Facing-Mode-Auswahl ablehnt.
-   try{
-     try{if(fullScanner)await fullScanner.clear()}catch(_){}
-     fullScanner=null;
-
-     const cameras=await Html5Qrcode.getCameras();
-     if(!cameras?.length)throw firstError;
-
-     // Auf iOS bevorzugen wir eine als "back" markierte Kamera; sonst letzte Kamera.
-     const rear=cameras.find(c=>/back|rear|environment|rück|hinten/i.test(c.label||'')) || cameras[cameras.length-1];
-     fullScanner=new Html5Qrcode('fullReader',constructorConfig);
-     await fullScanner.start(rear.id,config,onSuccess,()=>{});
-   }catch(e){
-     console.error('iOS scanner error',e);
-     try{if(fullScanner)await fullScanner.clear()}catch(_){}
-     fullScanner=null;
-     $('fullScannerModal').classList.add('hidden');
-     toast('Live-Scanner nicht verfügbar – bitte „Foto scannen“ nutzen');
-   }
+   Quagga.offDetected(handleQuaggaDetected);
+   Quagga.onDetected(handleQuaggaDetected);
+   Quagga.start();
+   quaggaActive=true;
+ }catch(e){
+   console.error('Quagga scanner error',e);
+   quaggaActive=false;
+   $('fullScannerModal').classList.add('hidden');
+   toast('Live-Scanner konnte nicht gestartet werden – Foto scannen nutzen');
  }
 }
-async function scanBarcodePhoto(file){
- if(!file || typeof Html5Qrcode==='undefined')return;
- try{
-   // Live-Kamera stoppen, damit iOS nicht zwei Medienpfade gleichzeitig offen hält.
-   await closeFullScanner(false);
-   const decoder=new Html5Qrcode('fileScanReader',{
-     formatsToSupport:[
-       Html5QrcodeSupportedFormats.EAN_13,
-       Html5QrcodeSupportedFormats.EAN_8,
-       Html5QrcodeSupportedFormats.UPC_A,
-       Html5QrcodeSupportedFormats.UPC_E,
-       Html5QrcodeSupportedFormats.CODE_128,
-       Html5QrcodeSupportedFormats.CODE_39,
-       Html5QrcodeSupportedFormats.ITF
-     ],
-     useBarCodeDetectorIfSupported:false,
-     verbose:false
-   });
-   const code=await decoder.scanFile(file,true);
-   try{await decoder.clear()}catch(_){}
-   const p=find(code);
-   if(!p){
-     toast('Barcode '+code+' erkannt – Artikel nicht gefunden');
-     return;
-   }
-   openScanProduct(p,true);
- }catch(e){
-   console.error('photo scan error',e);
-   toast('Barcode im Foto nicht erkannt');
+
+function handleQuaggaDetected(result){
+ const code=result?.codeResult?.code;
+ if(!code || code===lastScan)return;
+
+ // Filter obvious unstable reads. EAN/UPC should be numeric and reasonably long.
+ const format=result?.codeResult?.format||'';
+ if(/ean|upc/i.test(format) && !/^\d{7,14}$/.test(code))return;
+
+ lastScan=code;
+ setTimeout(()=>lastScan='',1800);
+
+ const frame=document.querySelector('.scan-frame');
+ frame?.classList.add('detected');
+ setTimeout(()=>frame?.classList.remove('detected'),350);
+
+ if(navigator.vibrate)navigator.vibrate(90);
+
+ const p=find(code);
+ if(!p){
+   toast('Barcode '+code+' erkannt – Artikel nicht gefunden');
+   return;
  }
+
+ closeFullScanner(false).then(()=>openScanProduct(p,true));
 }
 
 async function closeFullScanner(showIdle=true){
- try{if(fullScanner){await fullScanner.stop();await fullScanner.clear();fullScanner=null}}catch(e){}
+ try{
+   if(quaggaActive && typeof Quagga!=='undefined'){
+     Quagga.offDetected(handleQuaggaDetected);
+     Quagga.stop();
+   }
+ }catch(e){}
+ quaggaActive=false;
+ const target=$('quaggaReader');
+ if(target)target.innerHTML='';
  $('fullScannerModal').classList.add('hidden');
 }
+
 
 async function switchFullCamera(){
  const isiOS=/iPad|iPhone|iPod/.test(navigator.userAgent) ||
    (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);
  if(isiOS){
-   toast('Auf iPhone/iPad wird automatisch die Rückkamera verwendet');
+   toast('Auf iPhone/iPad verwendet der Scanner automatisch die Rückkamera');
    return;
  }
- fullFacing=fullFacing==='environment'?'user':'environment';
  await closeFullScanner(false);
  setTimeout(()=>openFullScanner(),180);
 }
@@ -459,15 +376,16 @@ async function toggleTorch(){
  const isiOS=/iPad|iPhone|iPod/.test(navigator.userAgent) ||
    (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);
  if(isiOS){
-   toast('Taschenlampe ist im Safari-Webscanner nicht zuverlässig verfügbar');
+   toast('Taschenlampe ist im iPhone-Webscanner nicht zuverlässig verfügbar');
    return;
  }
  try{
-   if(!fullScanner){toast('Scanner ist nicht aktiv');return}
-   const caps=fullScanner.getRunningTrackCapabilities?.();
-   if(!caps?.torch){toast('Taschenlampe wird von dieser Kamera nicht unterstützt');return}
-   const settings=fullScanner.getRunningTrackSettings?.();
-   await fullScanner.applyVideoConstraints({advanced:[{torch:!settings?.torch}]});
+   const track=Quagga?.CameraAccess?.getActiveTrack?.();
+   if(!track){toast('Keine aktive Kamera');return}
+   const caps=track.getCapabilities?.();
+   if(!caps?.torch){toast('Taschenlampe nicht unterstützt');return}
+   const current=track.getSettings?.().torch||false;
+   await track.applyConstraints({advanced:[{torch:!current}]});
  }catch(e){toast('Taschenlampe konnte nicht geschaltet werden')}
 }
 async function startScanner(){if(typeof Html5Qrcode==='undefined'){toast('Scanner konnte nicht geladen werden');return}$('scannerIdle').classList.add('hidden');$('scannerLive').classList.remove('hidden');try{scanner=new Html5Qrcode('reader');await scanner.start({facingMode:'environment'},{fps:12,qrbox:{width:280,height:160}},code=>{if(code===lastScan)return;lastScan=code;setTimeout(()=>lastScan='',1200);$('searchInput').value=code;selectProduct()})}catch(e){toast('Kamera konnte nicht gestartet werden')}}

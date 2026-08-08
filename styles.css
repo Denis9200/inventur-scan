@@ -76,9 +76,9 @@ button,input,select{font:inherit}.app-shell{max-width:1500px;margin:auto;display
 .scanner-top{display:flex;justify-content:space-between;align-items:center;padding:18px 20px;border-bottom:1px solid #1d1d1d;background:#050505}
 .scanner-top h2{margin:4px 0 0;font-size:24px}
 .scanner-stage{position:relative;overflow:hidden;background:#000;min-height:0}
-#fullReader{position:absolute;inset:0;width:100%;height:100%}
-#fullReader video{width:100%!important;height:100%!important;object-fit:cover!important}
-#fullReader>div{border:0!important}
+#quaggaReader{position:absolute;inset:0;width:100%;height:100%}
+#quaggaReader video{width:100%!important;height:100%!important;object-fit:cover!important}
+#quaggaReader>div{border:0!important}
 .scan-overlay{position:absolute;inset:0;pointer-events:none;display:grid;place-items:center;background:linear-gradient(rgba(0,0,0,.34),rgba(0,0,0,.08) 30%,rgba(0,0,0,.08) 70%,rgba(0,0,0,.42))}
 .scan-frame{width:min(78vw,520px);aspect-ratio:1.65;border:2px solid rgba(255,255,255,.9);border-radius:18px;box-shadow:0 0 0 9999px rgba(0,0,0,.12);position:relative}
 .scan-frame:before,.scan-frame:after{content:"";position:absolute;left:4%;right:4%;height:2px;background:#e2332b;top:50%;box-shadow:0 0 9px rgba(226,51,43,.7)}
@@ -137,3 +137,11 @@ button,input,select{font:inherit}.app-shell{max-width:1500px;margin:auto;display
 .ios-fallback{display:flex;justify-content:center;align-items:center;gap:10px;padding:10px 16px;background:#050505;border-top:1px solid #1d1d1d}
 .ios-fallback span{font-size:11px;color:#777}
 @media(max-width:650px){.ios-fallback{flex-direction:column}.ios-fallback span{text-align:center}}
+
+#quaggaReader canvas.drawingBuffer{
+  position:absolute;inset:0;width:100%!important;height:100%!important;object-fit:cover;pointer-events:none
+}
+#quaggaReader video{
+  position:absolute;inset:0;width:100%!important;height:100%!important;object-fit:cover
+}
+.scan-frame.detected{border-color:#62d64c;box-shadow:0 0 0 9999px rgba(0,0,0,.12),0 0 24px rgba(98,214,76,.35)}

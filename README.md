@@ -1,17 +1,28 @@
-# Inventur Scan V5 – iPhone/iPad Scanner Fix
+# Inventur Scan V5 – Step 6: Quagga2 Scanner
 
-iOS-Anpassungen:
-- Live-Scanner startet mit einfacher `facingMode: "environment"` Konfiguration.
-- Auf iPhone/iPad kein erzwungener Autofokus, Zoom oder Torch beim Start.
-- Niedrigere FPS für Safari.
-- Größerer Scanbereich für 1D-EAN-Barcodes.
-- BarcodeDetector wird auf iOS nicht erzwungen.
-- Kamera-ID-Fallback, falls `facingMode` nicht funktioniert.
-- zusätzlicher „Foto scannen“-Fallback für iPhone/iPad.
-- Foto-Fallback liest EAN-13, EAN-8, UPC, Code 128, Code 39 und ITF.
-- Android bleibt weiterhin unterstützt.
+Der Live-Scanner wurde von html5-qrcode auf Quagga2 umgestellt.
 
-Nach GitHub-Upload:
-1. PWA/Safari komplett schließen.
-2. Neu öffnen.
-3. Falls noch alte Dateien erscheinen: Safari-Seite neu laden bzw. PWA einmal entfernen und neu zum Home-Bildschirm hinzufügen.
+Warum:
+- Fokus auf echte 1D-Produktbarcodes
+- EAN-13 / EAN-8
+- UPC-A / UPC-E
+- Code 128 / Code 39
+- Interleaved 2 of 5
+- bessere Live-Lokalisierung von länglichen Barcodes
+
+iPhone/iPad:
+- Rückkamera
+- 1920x1080 bevorzugt
+- ohne Worker für bessere Safari-Kompatibilität
+- geringere Scanfrequenz
+- Foto-Scan bleibt als Fallback erhalten
+
+Android:
+- Rückkamera
+- Worker werden genutzt, soweit verfügbar
+- Taschenlampe bleibt als optionale Funktion
+
+Nach GitHub Upload:
+1. installierte PWA vollständig schließen
+2. neu öffnen
+3. falls weiterhin alte Oberfläche/Scanner läuft: PWA entfernen und erneut installieren
