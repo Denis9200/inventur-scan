@@ -1,12 +1,35 @@
-# Inventur Scan V6c – Artikel-Button Fix
+# Inventur Scan V6d – Runtime-/Button-Fix
 
-Behoben:
-- „+ Neuer Artikel“ ist unter Lagerbestand/Artikel wieder sichtbar.
-- Der Button öffnet wieder die vorhandene Artikelmaske.
-- Neue Artikel können Name, Barcode, Sollbestand, Mindestbestand, EK, VK, Einheit, Gramm pro VE und Mengen pro Lagerort enthalten.
-- Neue Artikel werden beim Speichern korrekt in den Bestand übernommen.
-- Bestehende Artikelbearbeitung und Betrieb/Kabinettware bleiben erhalten.
-- Scanner-Fix aus V6b bleibt erhalten.
+## Gefundener Fehler
+Beim V6-Umbau wurde der Button `demoBtn` aus dem Dashboard entfernt.
+In `app.js` stand aber weiterhin:
 
-Nach GitHub-Upload:
-PWA vollständig schließen und neu öffnen.
+`$('demoBtn').addEventListener(...)`
+
+Da das Element nicht mehr existierte, entstand beim Laden der App ein JavaScript-Fehler.
+Der Browser brach die weitere Initialisierung ab. Deshalb reagierten danach u. a.:
+
+- Kamera / Scanner
+- „+ Neuer Artikel“
+- Popups
+- weitere Buttons
+
+nicht mehr.
+
+## Behoben
+- Zugriff auf den optionalen Demo-Button ist jetzt abgesichert.
+- Service-Worker-Cache erneut geändert, damit die defekte JS-Datei nicht weiter geladen wird.
+- Statischer UI-Check: Keine fehlenden direkten Event-Ziele gefunden.
+
+Die Funktionen aus V6 bleiben erhalten:
+- Inventur
+- Quagga2 Barcode-Scanner
+- unbekannte Barcodes → Artikel anlegen
+- Lagerbestand / Artikel bearbeiten
+- Betrieb
+- Kabinettware in Gramm
+- Tube leer
+- Schwund / Verlust
+- Verbrauchshistorie
+
+Nach GitHub-Upload die PWA komplett schließen und neu öffnen.

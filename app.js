@@ -695,7 +695,7 @@ function finish(){if(!products.length){toast('Keine Inventur');return}let h=[];t
 document.querySelectorAll('.nav-item').forEach(b=>b.addEventListener('click',()=>go(b.dataset.page)));
 document.querySelectorAll('[data-go]').forEach(b=>b.addEventListener('click',()=>go(b.dataset.go)));
 $('themeBtn').addEventListener('click',()=>{theme=theme==='dark'?'light':'dark';if(theme==='light')document.documentElement.dataset.theme='light';else delete document.documentElement.dataset.theme});
-$('demoBtn').addEventListener('click',demo);$('dashImport').addEventListener('change',e=>importFile(e.target.files[0]));$('inventoryImport').addEventListener('change',e=>importFile(e.target.files[0]));
+$('demoBtn')?.addEventListener('click',demo);$('dashImport').addEventListener('change',e=>importFile(e.target.files[0]));$('inventoryImport').addEventListener('change',e=>importFile(e.target.files[0]));
 $('addLocation').addEventListener('click',()=>{const l=tx($('newLocation').value);if(l&&!locations.includes(l)){locations.push(l);$('newLocation').value='';save();render()}});
 $('findProduct').addEventListener('click',()=>{const p=find($('searchInput').value);if(!p){toast('Artikel nicht gefunden');return}openScanProduct(p,false)});
 $('searchInput').addEventListener('keydown',e=>{if(e.key==='Enter'){const p=find($('searchInput').value);if(!p){toast('Artikel nicht gefunden');return}openScanProduct(p,false)}});$('plus').addEventListener('click',()=>$('qty').value=num($('qty').value)+1);$('minus').addEventListener('click',()=>$('qty').value=Math.max(0,num($('qty').value)-1));$('saveCount').addEventListener('click',saveCount);
@@ -720,7 +720,7 @@ $('exportCsv').addEventListener('click',exportCsv);$('finishInventory').addEvent
 $('resetData').addEventListener('click',()=>{if(confirm('Laufende Inventur wirklich löschen?')){products=[];recent=[];localStorage.removeItem(KEY);render();toast('Inventur gelöscht')}});
 $('closeLocationDetail').addEventListener('click',()=>{$('locationDetail').classList.add('hidden');activeLocationDetail=null});
 $('articleScanBtn').addEventListener('click',startArticleScanner);
-$('articleScanClose').addEventListener('click',stopArticleScanner);
+$('articleScanClose')?.addEventListener('click',stopArticleScanner);
 $('closeFullScanner').addEventListener('click',async()=>{await closeFullScanner();scannerMode='inventory'});
 $('scannerCancelBtn').addEventListener('click',async()=>{await closeFullScanner();scannerMode='inventory'});
 $('scannerSwitchBtn').addEventListener('click',switchFullCamera);
