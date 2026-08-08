@@ -22,7 +22,8 @@
     <nav class="side-nav">
       <button class="nav-item active" data-page="dashboard"><span>⌂</span>Dashboard</button>
       <button class="nav-item" data-page="inventory"><span>▣</span>Inventur</button>
-      <button class="nav-item" data-page="articles"><span>◇</span>Artikel</button>
+      <button class="nav-item" data-page="operations"><span>◉</span>Betrieb</button>
+      <button class="nav-item" data-page="articles"><span>◇</span>Lagerbestand</button>
       <button class="nav-item" data-page="locations"><span>⌖</span>Lagerorte</button>
       <button class="nav-item" data-page="stats"><span>▥</span>Auswertung</button>
       <button class="nav-item" data-page="history"><span>◷</span>Historie</button>
@@ -57,6 +58,7 @@
         </div>
         <div class="welcome-actions">
           <button class="btn gold-btn" data-go="inventory">Inventur fortsetzen</button>
+          <button class="btn dark-btn" data-go="operations">Betrieb öffnen</button>
           <label class="btn dark-btn" for="dashImport">Bestand importieren</label>
           <input id="dashImport" type="file" accept=".csv,.xlsx,.xls" hidden>
         </div>
@@ -124,8 +126,8 @@
 
       <div class="quick-bar">
         <button data-go="inventory"><b>▣</b><span>Inventur</span></button>
-        <button id="demoBtn"><b>✦</b><span>Demo laden</span></button>
-        <button data-go="articles"><b>⌕</b><span>Artikel</span></button>
+        <button data-go="operations"><b>◉</b><span>Betrieb</span></button>
+        <button data-go="articles"><b>◇</b><span>Lagerbestand</span></button>
         <button data-go="stats"><b>▥</b><span>Auswertung</span></button>
       </div>
     </section>
@@ -174,6 +176,72 @@
       <div class="content-card">
         <div class="section-head"><div><span class="kicker">SOLL / IST</span><h2>Inventurstatus</h2></div><button class="btn dark-btn" id="finishInventory">Inventur abschließen</button></div>
         <div class="card-list" id="inventoryCards"></div>
+      </div>
+    </section>
+
+    
+    <section class="page" id="page-operations">
+      <div class="page-mode-hero">
+        <div>
+          <span class="kicker gold">BETRIEB</span>
+          <h2>Kabinettware & Verbrauch</h2>
+          <p>Produkte im täglichen Salonbetrieb erfassen – grammgenau, nachvollziehbar und direkt mit dem Lagerbestand verbunden.</p>
+        </div>
+        <button class="btn gold-btn" id="cabinetScanBtn">▣ Kabinettware scannen</button>
+      </div>
+
+      <div class="metric-grid">
+        <article class="metric-card">
+          <div class="metric-top"><span>Offene Kabinettware</span><b class="metric-icon">◉</b></div>
+          <strong id="cabOpenCount">0</strong><small>angebrochene Produkte</small>
+        </article>
+        <article class="metric-card">
+          <div class="metric-top"><span>Verbrauch heute</span><b class="metric-icon">g</b></div>
+          <strong id="cabTodayGrams">0 g</strong><small>erfasste Entnahme</small>
+        </article>
+        <article class="metric-card">
+          <div class="metric-top"><span>Leer gemeldet</span><b class="metric-icon">✓</b></div>
+          <strong id="cabEmptyToday">0</strong><small>heute abgeschlossene Gebinde</small>
+        </article>
+        <article class="metric-card">
+          <div class="metric-top"><span>Schwund / Verlust</span><b class="metric-icon alert">!</b></div>
+          <strong id="cabWasteToday">0 g</strong><small>heute dokumentiert</small>
+        </article>
+      </div>
+
+      <div class="dashboard-grid">
+        <article class="panel">
+          <div class="panel-head">
+            <div><span class="kicker">KABINETTWARE</span><h3>Aktuell angebrochen</h3></div>
+            <button class="btn dark-btn" id="newCabinetBtn">+ Manuell öffnen</button>
+          </div>
+          <div id="openCabinetList" class="cabinet-list empty">Noch keine Kabinettware geöffnet.</div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-head">
+            <div><span class="kicker">VERBRAUCH</span><h3>Letzte Entnahmen</h3></div>
+          </div>
+          <div id="usageHistory" class="activity-list empty">Noch kein Verbrauch erfasst.</div>
+        </article>
+      </div>
+
+      <div class="content-card">
+        <div class="section-head">
+          <div>
+            <span class="kicker gold">SCHNELLERFASSUNG</span>
+            <h2>Produkt auswählen</h2>
+            <p>Suche bekannte Kabinettware oder scanne direkt den Barcode.</p>
+          </div>
+        </div>
+        <div class="article-search-wrap">
+          <div class="article-search-line">
+            <input id="cabinetSearch" placeholder="Produktname oder Barcode …" autocomplete="off">
+            <button class="btn gold-btn" id="cabinetSearchScanBtn">▣ Scannen</button>
+          </div>
+          <div id="cabinetSuggestions" class="suggestions hidden"></div>
+        </div>
+        <div id="cabinetProductCards" class="card-list"></div>
       </div>
     </section>
 
@@ -325,6 +393,82 @@
 
 
 
+
+<dialog id="cabinetUsageDialog" class="edit-product-dialog">
+  <div class="edit-product-body">
+    <div class="dialog-head">
+      <div>
+        <span class="kicker gold">KABINETTWARE</span>
+        <h2 id="cuName">Produkt</h2>
+        <p id="cuBarcode"></p>
+      </div>
+      <button class="round-btn" id="cuClose">×</button>
+    </div>
+
+    <div class="cabinet-status-grid">
+      <div><span>Inhalt pro VE</span><strong id="cuPackage">0 g</strong></div>
+      <div><span>Aktuell offen</span><strong id="cuRemaining">0 g</strong></div>
+      <div><span>Entnommen gesamt</span><strong id="cuUsed">0 g</strong></div>
+    </div>
+
+    <label class="field">
+      <span>Lagerort / Kabinett</span>
+      <select id="cuLocation"></select>
+    </label>
+
+    <div class="edit-section">
+      <span class="kicker gold">ENTNAHME</span>
+      <h3>Wie viel wurde verwendet?</h3>
+      <div class="scan-counter">
+        <button id="cuMinus">−</button>
+        <input id="cuGrams" type="number" min="0" step="1" value="10" inputmode="decimal">
+        <button id="cuPlus">+</button>
+      </div>
+      <div class="preset-row">
+        <button type="button" data-grams="5">5 g</button>
+        <button type="button" data-grams="10">10 g</button>
+        <button type="button" data-grams="20">20 g</button>
+        <button type="button" data-grams="30">30 g</button>
+      </div>
+    </div>
+
+    <div class="cabinet-note-row">
+      <label class="field">
+        <span>Art der Buchung</span>
+        <select id="cuType">
+          <option value="use">Verbrauch Kundin</option>
+          <option value="waste">Schwund / Verlust</option>
+        </select>
+      </label>
+      <label class="field">
+        <span>Notiz (optional)</span>
+        <input id="cuNote" placeholder="z. B. Ansatz Farbe">
+      </label>
+    </div>
+
+    <div class="cabinet-actions">
+      <button class="btn dark-btn" id="cuMarkEmpty">Tube / Gebinde ist leer</button>
+      <button class="btn gold-btn" id="cuSave">Verbrauch speichern</button>
+    </div>
+  </div>
+</dialog>
+
+<dialog id="cabinetOpenDialog" class="edit-product-dialog">
+  <div class="edit-product-body">
+    <div class="dialog-head">
+      <div><span class="kicker gold">KABINETTWARE ÖFFNEN</span><h2 id="coName">Produkt</h2></div>
+      <button class="round-btn" id="coClose">×</button>
+    </div>
+    <p>Für dieses Produkt ist aktuell kein offenes Gebinde vorhanden.</p>
+    <div class="edit-grid">
+      <label class="field"><span>Inhalt pro VE (g)</span><input id="coPackageGrams" type="number" min="1"></label>
+      <label class="field"><span>Lagerort / Kabinett</span><select id="coLocation"></select></label>
+    </div>
+    <p class="muted">Beim Öffnen wird eine ganze Verkaufseinheit aus dem Stückbestand entnommen und als angebrochene Kabinettware geführt.</p>
+    <button class="btn gold-btn full" id="coOpen">Neue Tube / neues Gebinde öffnen</button>
+  </div>
+</dialog>
+
 <dialog id="unknownBarcodeDialog" class="unknown-barcode-dialog">
   <div class="unknown-barcode-body">
     <div class="unknown-icon">?</div>
@@ -373,6 +517,17 @@
       <label class="field">
         <span>Verkaufspreis €</span>
         <input id="epSell" type="number" min="0" step="0.01">
+      </label>
+      <label class="field">
+        <span>Bestandseinheit</span>
+        <select id="epUnit">
+          <option value="piece">Stück / ganze VE</option>
+          <option value="gram">Kabinettware in Gramm</option>
+        </select>
+      </label>
+      <label class="field">
+        <span>Inhalt pro VE (g)</span>
+        <input id="epPackageGrams" type="number" min="0" step="1" placeholder="z. B. 60">
       </label>
     </div>
 

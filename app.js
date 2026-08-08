@@ -1,7 +1,7 @@
 
 const $=id=>document.getElementById(id);
 const KEY='dj_inventur_v5_step1', HIST='dj_inventur_history_v5';
-let products=[],locations=['Salon','Keller'],recent=[],current=null,scanner=null,articleScanner=null,fullScanner=null,lastScan='',theme='dark',activeLocationDetail=null,scanProduct=null,scanRestartAfterSave=false,fullFacing='environment',editProduct=null,quaggaActive=false,scanConfirming=false,pendingUnknownBarcode='';
+let products=[],locations=['Salon','Keller'],recent=[],current=null,scanner=null,articleScanner=null,fullScanner=null,lastScan='',theme='dark',activeLocationDetail=null,scanProduct=null,scanRestartAfterSave=false,fullFacing='environment',editProduct=null,quaggaActive=false,scanConfirming=false,pendingUnknownBarcode='',usageLog=[],cabinetProduct=null,pendingCabinetProduct=null;
 
 const num=v=>{const x=Number(String(v??'').replace(',','.'));return Number.isFinite(x)?x:0};
 const tx=v=>String(v??'').trim();
@@ -11,20 +11,22 @@ const diff=p=>total(p)-p.expected;
 const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 
 function toast(t){$('toast').textContent=t;$('toast').classList.remove('hidden');setTimeout(()=>$('toast').classList.add('hidden'),1500)}
-function save(){localStorage.setItem(KEY,JSON.stringify({products,locations,recent}));$('saveBadge').textContent='Gespeichert'}
-function load(){try{const d=JSON.parse(localStorage.getItem(KEY)||'null');if(d){products=d.products||[];locations=d.locations?.length?d.locations:['Salon','Keller'];recent=d.recent||[]}}catch(e){}}
-function go(p){document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));document.querySelectorAll('.nav-item').forEach(x=>x.classList.remove('active'));$('page-'+p).classList.add('active');document.querySelector(`.nav-item[data-page="${p}"]`)?.classList.add('active');const names={dashboard:['Dashboard','Dein Lagerbestand auf einen Blick.'],inventory:['Inventur','Scannen, zählen und direkt vergleichen.'],articles:['Artikel','Produkte, Preise und Mindestbestände.'],locations:['Lagerorte','Bestände nach Bereichen.'],stats:['Auswertung','Lagerwerte und Bestellbedarf.'],history:['Historie','Abgeschlossene Inventuren.'],settings:['Einstellungen','App und lokale Daten verwalten.']};$('pageHeading').textContent=names[p][0];$('pageSubheading').textContent=names[p][1];window.scrollTo({top:0,behavior:'smooth'})}
+function save(){localStorage.setItem(KEY,JSON.stringify({products,locations,recent,usageLog}));$('saveBadge').textContent='Gespeichert'}
+function load(){try{const d=JSON.parse(localStorage.getItem(KEY)||'null');if(d){products=d.products||[];locations=d.locations?.length?d.locations:['Salon','Keller'];recent=d.recent||[];usageLog=d.usageLog||[]}}catch(e){}}
+function go(p){document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));document.querySelectorAll('.nav-item').forEach(x=>x.classList.remove('active'));$('page-'+p).classList.add('active');document.querySelector(`.nav-item[data-page="${p}"]`)?.classList.add('active');const names={dashboard:['Dashboard','Dein Lagerbestand auf einen Blick.'],inventory:['Inventur','Scannen, zählen und direkt vergleichen.'],operations:['Betrieb','Kabinettware und Verbrauch erfassen.'],articles:['Lagerbestand','Produkte, Preise und Mindestbestände.'],locations:['Lagerorte','Bestände nach Bereichen.'],stats:['Auswertung','Lagerwerte und Bestellbedarf.'],history:['Historie','Abgeschlossene Inventuren.'],settings:['Einstellungen','App und lokale Daten verwalten.']};$('pageHeading').textContent=names[p][0];$('pageSubheading').textContent=names[p][1];window.scrollTo({top:0,behavior:'smooth'})}
 function find(q){q=tx(q).toLowerCase();return products.find(p=>(p.barcode||'').toLowerCase()===q)||products.find(p=>p.name.toLowerCase().includes(q))}
 function detect(r,names){const ks=Object.keys(r);for(const n of names){let k=ks.find(x=>x.toLowerCase().replace(/[\s_-]/g,'')===n.toLowerCase().replace(/[\s_-]/g,''));if(k)return r[k]}for(const k of ks){if(names.some(n=>k.toLowerCase().includes(n.toLowerCase())))return r[k]}return''}
 function mapRows(rows){
- products=rows.map((r,i)=>({id:crypto.randomUUID?crypto.randomUUID():'p'+i,name:tx(detect(r,['Artikel','Artikelname','Produkt','Produktname','Bezeichnung','Name']))||'Unbenannter Artikel',barcode:tx(detect(r,['Barcode','EAN','GTIN','Artikelnummer','Code'])),expected:num(detect(r,['Bestand','Soll','Lagerbestand','Warenbestand','Menge','Stock'])),buy:num(detect(r,['Einkaufspreis','EK','Purchase Price'])),sell:num(detect(r,['Verkaufspreis','VK','Retail Price'])),min:num(detect(r,['Mindestbestand','Minimum','Min Bestand'])),counts:{}}));recent=[];save();render();toast(products.length+' Artikel geladen');go('inventory')
+ products=rows.map((r,i)=>({id:crypto.randomUUID?crypto.randomUUID():'p'+i,name:tx(detect(r,['Artikel','Artikelname','Produkt','Produktname','Bezeichnung','Name']))||'Unbenannter Artikel',barcode:tx(detect(r,['Barcode','EAN','GTIN','Artikelnummer','Code'])),expected:num(detect(r,['Bestand','Soll','Lagerbestand','Warenbestand','Menge','Stock'])),buy:num(detect(r,['Einkaufspreis','EK','Purchase Price'])),sell:num(detect(r,['Verkaufspreis','VK','Retail Price'])),min:num(detect(r,['Mindestbestand','Minimum','Min Bestand'])),unit:'piece',packageGrams:0,cabinetOpen:null,counts:{}}));recent=[];save();render();toast(products.length+' Artikel geladen');go('inventory')
 }
 function demo(){products=[
 {id:'1',name:'Shampoo Repair 250 ml',barcode:'4000000000011',expected:10,buy:6.2,sell:14.9,min:4,counts:{Salon:5}},
 {id:'2',name:'Conditioner Color 200 ml',barcode:'4000000000028',expected:6,buy:7.1,sell:16.9,min:3,counts:{Salon:6}},
 {id:'3',name:'Haarspray Strong 300 ml',barcode:'4000000000035',expected:8,buy:5.7,sell:13.5,min:3,counts:{Keller:3}},
 {id:'4',name:'Styling Paste Matt 100 ml',barcode:'4000000000042',expected:4,buy:8.4,sell:18.9,min:2,counts:{}},
-{id:'5',name:'Haaröl Premium 100 ml',barcode:'4000000000059',expected:5,buy:9.8,sell:22.5,min:2,counts:{Salon:2,Keller:2}}
+{id:'5',name:'Haaröl Premium 100 ml',barcode:'4000000000059',expected:5,buy:9.8,sell:22.5,min:2,unit:'piece',packageGrams:0,cabinetOpen:null,counts:{Salon:2,Keller:2}},
+{id:'6',name:'Color Creme 6/0 60 g',barcode:'4000000000066',expected:12,buy:5.1,sell:11.9,min:4,unit:'gram',packageGrams:60,cabinetOpen:{location:'Salon',remainingGrams:42,openedAt:new Date().toISOString(),usedGrams:18},counts:{Salon:11}},
+{id:'7',name:'Color Creme 7/1 60 g',barcode:'4000000000073',expected:8,buy:5.1,sell:11.9,min:3,unit:'gram',packageGrams:60,cabinetOpen:null,counts:{Salon:8}}
 ];recent=[{name:'Haaröl Premium 100 ml',qty:2,loc:'Keller',at:'10:18'},{name:'Conditioner Color 200 ml',qty:6,loc:'Salon',at:'10:12'}];save();render();toast('Demo-Daten geladen')}
 function renderLocations(){
  const s=$('locationSelect'),cur=s.value;
@@ -53,6 +55,9 @@ function openNewArticle(){
    buy:0,
    sell:0,
    min:0,
+   unit:'piece',
+   packageGrams:0,
+   cabinetOpen:null,
    counts:{}
  };
  locations.forEach(loc=>p.counts[loc]=0);
@@ -88,6 +93,9 @@ function openEditProduct(p){
  $('epMin').value=p.min||0;
  $('epBuy').value=p.buy||0;
  $('epSell').value=p.sell||0;
+ ensureCabinetFields(p);
+ $('epUnit').value=p.unit||'piece';
+ $('epPackageGrams').value=p.packageGrams||0;
 
  $('epLocations').innerHTML=locations.map(loc=>`
    <label class="edit-location-row">
@@ -126,6 +134,9 @@ function saveEditProduct(){
  editProduct.min=Math.max(0,num($('epMin').value));
  editProduct.buy=Math.max(0,num($('epBuy').value));
  editProduct.sell=Math.max(0,num($('epSell').value));
+ editProduct.unit=$('epUnit').value||'piece';
+ editProduct.packageGrams=Math.max(0,num($('epPackageGrams').value));
+ ensureCabinetFields(editProduct);
  editProduct.counts=editProduct.counts||{};
  locations.forEach(loc=>editProduct.counts[loc]=0);
  $('epLocations').querySelectorAll('input[data-ep-location]').forEach(i=>editProduct.counts[i.dataset.epLocation]=Math.max(0,num(i.value)));
@@ -149,6 +160,178 @@ function deleteEditProduct(){
  editProduct=null;
  save();render();toast('Artikel gelöscht');
 }
+
+function ensureCabinetFields(p){
+ if(!p.unit)p.unit='piece';
+ if(!('packageGrams' in p))p.packageGrams=0;
+ if(!('cabinetOpen' in p))p.cabinetOpen=null;
+}
+function isCabinetProduct(p){
+ ensureCabinetFields(p);
+ return p.unit==='gram' || p.packageGrams>0;
+}
+function cabinetRemaining(p){
+ return p.cabinetOpen ? Math.max(0,num(p.cabinetOpen.remainingGrams)) : 0;
+}
+function cabinetUsed(p){
+ return p.cabinetOpen ? Math.max(0,num(p.cabinetOpen.usedGrams)) : 0;
+}
+function todayKey(d=new Date()){
+ return d.toISOString().slice(0,10);
+}
+function renderOperations(){
+ products.forEach(ensureCabinetFields);
+ const cabinet=products.filter(isCabinetProduct);
+ const open=cabinet.filter(p=>p.cabinetOpen && cabinetRemaining(p)>0);
+ const today=todayKey();
+ const logsToday=usageLog.filter(x=>(x.date||'').slice(0,10)===today);
+ const usedToday=logsToday.filter(x=>x.type==='use').reduce((a,x)=>a+num(x.grams),0);
+ const wasteToday=logsToday.filter(x=>x.type==='waste').reduce((a,x)=>a+num(x.grams),0);
+ const emptyToday=logsToday.filter(x=>x.type==='empty').length;
+
+ $('cabOpenCount').textContent=open.length;
+ $('cabTodayGrams').textContent=Math.round(usedToday)+' g';
+ $('cabWasteToday').textContent=Math.round(wasteToday)+' g';
+ $('cabEmptyToday').textContent=emptyToday;
+
+ $('openCabinetList').innerHTML=open.length?open.map(p=>{
+   const rem=cabinetRemaining(p),pkg=Math.max(1,num(p.packageGrams)),pct=Math.max(0,Math.min(100,Math.round(rem/pkg*100)));
+   return `<div class="cabinet-item" data-cabinet-id="${esc(p.id)}">
+     <div class="cabinet-item-top">
+       <div><strong>${esc(p.name)}</strong><small>${esc(p.cabinetOpen.location||'Salon')} · ${Math.round(pct)} % Rest</small></div>
+       <strong>${Math.round(rem)} g</strong>
+     </div>
+     <div class="cabinet-progress"><i style="width:${pct}%"></i></div>
+   </div>`
+ }).join(''):'Noch keine Kabinettware geöffnet.';
+
+ $('usageHistory').innerHTML=usageLog.length?usageLog.slice(0,10).map(x=>`
+   <div class="activity-row">
+     <div><strong>${esc(x.productName)}</strong><small style="display:block;color:#777">${esc(x.location||'')} · ${new Date(x.date).toLocaleString('de-DE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}${x.note?' · '+esc(x.note):''}</small></div>
+     <b style="color:${x.type==='waste'?'var(--danger)':x.type==='empty'?'var(--good)':'var(--gold2)'}">${x.type==='empty'?'leer':(x.type==='waste'?'-':'-')+Math.round(num(x.grams))+' g'}</b>
+   </div>`).join(''):'Noch kein Verbrauch erfasst.';
+
+ const q=tx($('cabinetSearch')?.value||'').toLowerCase();
+ const list=cabinet.filter(p=>!q||p.name.toLowerCase().includes(q)||(p.barcode||'').includes(q));
+ $('cabinetProductCards').innerHTML=list.length?list.map(p=>`
+   <article class="cabinet-product-card" data-cabinet-id="${esc(p.id)}">
+     <span class="cab-tag">${p.cabinetOpen?'offen':'geschlossen'}</span>
+     <h4>${esc(p.name)}</h4>
+     <div class="meta">${esc(p.barcode||'–')}</div>
+     <div class="numbers">
+       <div><small>VE</small><strong>${Math.round(num(p.packageGrams))} g</strong></div>
+       <div><small>Rest offen</small><strong>${Math.round(cabinetRemaining(p))} g</strong></div>
+       <div><small>Stückbestand</small><strong>${total(p)}</strong></div>
+     </div>
+   </article>`).join(''):'<p style="color:#777">Keine Kabinettware gefunden.</p>';
+
+ document.querySelectorAll('[data-cabinet-id]').forEach(el=>el.addEventListener('click',()=>{
+   const p=products.find(x=>String(x.id)===String(el.dataset.cabinetId));
+   if(p)openCabinetUsageFlow(p);
+ }));
+ renderCabinetSuggestions();
+}
+function renderCabinetSuggestions(){
+ const box=$('cabinetSuggestions'); if(!box)return;
+ const q=tx($('cabinetSearch').value).toLowerCase();
+ if(!q){box.classList.add('hidden');box.innerHTML='';return}
+ const list=products.filter(isCabinetProduct).filter(p=>p.name.toLowerCase().includes(q)||(p.barcode||'').includes(q)).slice(0,7);
+ box.innerHTML=list.length?list.map(p=>`<button class="suggestion-item" data-cab-suggestion="${esc(p.id)}"><div><strong>${esc(p.name)}</strong><small>${esc(p.barcode||'–')} · ${Math.round(num(p.packageGrams))} g/VE</small></div><span class="suggestion-stock">${p.cabinetOpen?Math.round(cabinetRemaining(p))+' g Rest':'geschlossen'}</span></button>`).join(''):'<div style="padding:12px;color:#777">Keine Kabinettware gefunden.</div>';
+ box.classList.remove('hidden');
+ box.querySelectorAll('[data-cab-suggestion]').forEach(b=>b.addEventListener('click',()=>{
+   const p=products.find(x=>String(x.id)===String(b.dataset.cabSuggestion));
+   box.classList.add('hidden'); if(p)openCabinetUsageFlow(p);
+ }));
+}
+function openCabinetUsageFlow(p){
+ ensureCabinetFields(p);
+ if(!isCabinetProduct(p)){
+   p.unit='gram';
+   if(!p.packageGrams)p.packageGrams=60;
+ }
+ if(!p.cabinetOpen){
+   pendingCabinetProduct=p;
+   $('coName').textContent=p.name;
+   $('coPackageGrams').value=p.packageGrams||60;
+   renderCabinetLocationOptions('coLocation');
+   $('cabinetOpenDialog').showModal();
+   return;
+ }
+ openCabinetUsage(p);
+}
+function renderCabinetLocationOptions(id){
+ const s=$(id); const cur=s.value;
+ s.innerHTML=locations.map(l=>`<option>${esc(l)}</option>`).join('');
+ if(locations.includes(cur))s.value=cur;
+ else if(locations.includes($('locationSelect')?.value))s.value=$('locationSelect').value;
+}
+function openCabinetUsage(p){
+ cabinetProduct=p;
+ $('cuName').textContent=p.name;
+ $('cuBarcode').textContent='Barcode: '+(p.barcode||'–');
+ $('cuPackage').textContent=Math.round(num(p.packageGrams))+' g';
+ $('cuRemaining').textContent=Math.round(cabinetRemaining(p))+' g';
+ $('cuUsed').textContent=Math.round(cabinetUsed(p))+' g';
+ renderCabinetLocationOptions('cuLocation');
+ $('cuLocation').value=p.cabinetOpen?.location||$('cuLocation').value;
+ $('cuGrams').value=Math.min(10,Math.max(1,Math.round(cabinetRemaining(p))));
+ $('cuType').value='use'; $('cuNote').value='';
+ $('cabinetUsageDialog').showModal();
+}
+function openNewCabinet(){
+ const candidates=products.filter(isCabinetProduct);
+ if(!candidates.length){toast('Noch keine Kabinettware angelegt');return}
+ go('operations'); $('cabinetSearch').focus();
+ toast('Produkt suchen oder Barcode scannen');
+}
+function openCabinetPackage(){
+ if(!pendingCabinetProduct)return;
+ const p=pendingCabinetProduct;
+ const grams=Math.max(1,num($('coPackageGrams').value)),loc=$('coLocation').value||'Salon';
+ p.unit='gram';p.packageGrams=grams;
+ // Opening a cabinet package consumes one whole VE from physical unopened stock.
+ p.counts=p.counts||{};
+ const available=num(p.counts[loc]);
+ if(available>0)p.counts[loc]=available-1;
+ else{
+   // We allow it, but log negative adjustment avoidance as zero and note discrepancy.
+   p.counts[loc]=0;
+ }
+ p.cabinetOpen={location:loc,remainingGrams:grams,usedGrams:0,openedAt:new Date().toISOString()};
+ usageLog.unshift({type:'open',productId:p.id,productName:p.name,grams:0,location:loc,date:new Date().toISOString(),note:'Neues Gebinde geöffnet'});
+ $('cabinetOpenDialog').close();pendingCabinetProduct=null;
+ save();render();openCabinetUsage(p);toast('Neue Kabinettware geöffnet');
+}
+function saveCabinetUse(markEmpty=false){
+ if(!cabinetProduct || !cabinetProduct.cabinetOpen)return;
+ const p=cabinetProduct,loc=$('cuLocation').value||p.cabinetOpen.location||'Salon';
+ let grams=Math.max(0,num($('cuGrams').value)),type=$('cuType').value,note=tx($('cuNote').value);
+ const before=cabinetRemaining(p);
+ if(markEmpty){
+   // User confirms the package is physically empty. Remaining system grams become variance/waste.
+   if(before>0){
+     usageLog.unshift({type:'empty',productId:p.id,productName:p.name,grams:before,location:loc,date:new Date().toISOString(),note:note||'Gebinde manuell als leer bestätigt'});
+   }
+   p.cabinetOpen.remainingGrams=0;
+   p.cabinetOpen.usedGrams=num(p.packageGrams);
+ }else{
+   grams=Math.min(grams,before);
+   p.cabinetOpen.remainingGrams=Math.max(0,before-grams);
+   p.cabinetOpen.usedGrams=num(p.cabinetOpen.usedGrams)+grams;
+   p.cabinetOpen.location=loc;
+   usageLog.unshift({type,productId:p.id,productName:p.name,grams,location:loc,date:new Date().toISOString(),note});
+ }
+ const becameEmpty=cabinetRemaining(p)<=0;
+ if(becameEmpty)p.cabinetOpen=null;
+ $('cabinetUsageDialog').close();cabinetProduct=null;
+ save();render();
+ toast(markEmpty?'Gebinde als leer abgeschlossen':'Verbrauch gespeichert');
+}
+async function startCabinetScanner(){
+ // Use same full scanner, but route scan result into cabinet flow.
+ window._cabinetScanMode=true;
+ await openFullScanner();
+}
 function render(){
  renderLocations();
  const counted=products.filter(p=>total(p)>0).length,diffs=products.filter(p=>total(p)>0&&diff(p)!==0).length,pct=products.length?Math.round(counted/products.length*100):0,value=products.reduce((a,p)=>a+total(p)*p.buy,0),below=products.filter(p=>p.min&&total(p)<p.min).length;
@@ -157,7 +340,7 @@ function render(){
  $('recentOverview').classList.toggle('empty',!recent.length);
  $('locationOverview').innerHTML=locations.map(loc=>{const countedLoc=products.filter(p=>num((p.counts||{})[loc])>0).length,p=products.length?Math.round(countedLoc/products.length*100):0;return `<div class="location-row"><div class="location-title"><span>${esc(loc)}</span><span>${p}%</span></div><div class="mini-progress"><i style="width:${p}%"></i></div></div>`}).join('')||'Keine Lagerorte.';
  $('inventoryCards').innerHTML=products.length?products.map(p=>productCard(p,true)).join(''):'<p style="color:#777">Noch keine Daten geladen.</p>';
- renderArticles();renderStats();renderLocationsPage();renderHistory();attachEditHandlers()
+ renderArticles();renderStats();renderLocationsPage();renderHistory();renderOperations();attachEditHandlers()
 }
 function productCard(p,inventory=false){const c=total(p),d=diff(p),cl=c===0?'':d===0?'diff-good':'diff-bad';return `<article class="product-card" data-edit-product="${esc(p.id)}"><h4>${esc(p.name)}</h4><div class="meta">${esc(p.barcode||'ohne Barcode')}</div><div class="numbers"><div><small>Soll</small><strong>${p.expected}</strong></div><div><small>Ist</small><strong>${c}</strong></div><div><small>Diff.</small><strong class="${cl}">${c?(d>0?'+':'')+d:'–'}</strong></div></div></article>`}
 
@@ -337,10 +520,13 @@ function continueAfterUnknown(){
 }
 function createFromUnknownBarcode(){
  const code=pendingUnknownBarcode;
+ const fromCabinet=!!window._cabinetScanMode;
+ window._cabinetScanMode=false;
  $('unknownBarcodeDialog').close();
  pendingUnknownBarcode='';
  openNewArticle();
  $('epBarcode').value=code;
+ if(fromCabinet){$('epUnit').value='gram';$('epPackageGrams').value=60;}
  $('epName').focus();
  toast('Barcode übernommen – Artikeldaten ergänzen');
 }
@@ -415,7 +601,12 @@ async function confirmBarcodeFromFrame(firstCode){
 
    if(p){
      if(navigator.vibrate)navigator.vibrate([70,40,70]);
-     openScanProduct(p,true);
+     if(window._cabinetScanMode){
+       window._cabinetScanMode=false;
+       openCabinetUsageFlow(p);
+     }else{
+       openScanProduct(p,true);
+     }
    }else{
      askCreateUnknownBarcode(confirmed);
    }
@@ -501,6 +692,20 @@ $('addLocation').addEventListener('click',()=>{const l=tx($('newLocation').value
 $('findProduct').addEventListener('click',()=>{const p=find($('searchInput').value);if(!p){toast('Artikel nicht gefunden');return}openScanProduct(p,false)});
 $('searchInput').addEventListener('keydown',e=>{if(e.key==='Enter'){const p=find($('searchInput').value);if(!p){toast('Artikel nicht gefunden');return}openScanProduct(p,false)}});$('plus').addEventListener('click',()=>$('qty').value=num($('qty').value)+1);$('minus').addEventListener('click',()=>$('qty').value=Math.max(0,num($('qty').value)-1));$('saveCount').addEventListener('click',saveCount);
 $('startScanner').addEventListener('click',openFullScanner);$('stopScanner').addEventListener('click',stopScanner);$('articleSearch').addEventListener('input',()=>{renderArticles();renderSuggestions()});$('newArticleBtn').addEventListener('click',openNewArticle);
+
+$('cabinetSearch').addEventListener('input',()=>{renderOperations()});
+$('cabinetScanBtn').addEventListener('click',startCabinetScanner);
+$('cabinetSearchScanBtn').addEventListener('click',startCabinetScanner);
+$('newCabinetBtn').addEventListener('click',openNewCabinet);
+$('coClose').addEventListener('click',()=>{$('cabinetOpenDialog').close();pendingCabinetProduct=null});
+$('coOpen').addEventListener('click',openCabinetPackage);
+$('cuClose').addEventListener('click',()=>{$('cabinetUsageDialog').close();cabinetProduct=null});
+$('cuMinus').addEventListener('click',()=>$('cuGrams').value=Math.max(0,num($('cuGrams').value)-1));
+$('cuPlus').addEventListener('click',()=>$('cuGrams').value=num($('cuGrams').value)+1);
+document.querySelectorAll('[data-grams]').forEach(b=>b.addEventListener('click',()=>$('cuGrams').value=b.dataset.grams));
+$('cuSave').addEventListener('click',()=>saveCabinetUse(false));
+$('cuMarkEmpty').addEventListener('click',()=>saveCabinetUse(true));
+
 $('unknownNo').addEventListener('click',continueAfterUnknown);
 $('unknownYes').addEventListener('click',createFromUnknownBarcode);
 $('exportCsv').addEventListener('click',exportCsv);$('finishInventory').addEventListener('click',finish);
@@ -508,8 +713,8 @@ $('resetData').addEventListener('click',()=>{if(confirm('Laufende Inventur wirkl
 $('closeLocationDetail').addEventListener('click',()=>{$('locationDetail').classList.add('hidden');activeLocationDetail=null});
 $('articleScanBtn').addEventListener('click',startArticleScanner);
 $('articleScanClose').addEventListener('click',stopArticleScanner);
-$('closeFullScanner').addEventListener('click',()=>closeFullScanner());
-$('scannerCancelBtn').addEventListener('click',()=>closeFullScanner());
+$('closeFullScanner').addEventListener('click',()=>{window._cabinetScanMode=false;closeFullScanner()});
+$('scannerCancelBtn').addEventListener('click',()=>{window._cabinetScanMode=false;closeFullScanner()});
 $('scannerSwitchBtn').addEventListener('click',switchFullCamera);
 $('scannerFlashBtn').addEventListener('click',toggleTorch);
 $('barcodePhotoInput').addEventListener('change',e=>{const f=e.target.files?.[0];if(f)scanBarcodePhoto(f);e.target.value=''});
