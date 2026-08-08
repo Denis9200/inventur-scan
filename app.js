@@ -1,1090 +1,204 @@
 
 const $=id=>document.getElementById(id);
-const KEY='dj_inventur_v5_step1', HIST='dj_inventur_history_v5';
-let products=[],locations=['Salon','Keller'],recent=[],current=null,scanner=null,articleScanner=null,fullScanner=null,lastScan='',theme='dark',activeLocationDetail=null,scanProduct=null,scanRestartAfterSave=false,fullFacing='environment',editProduct=null,quaggaActive=false,scanConfirming=false,pendingUnknownBarcode='',usageLog=[],employeeSaleLog=[],assetLog=[],cabinetProduct=null,pendingCabinetProduct=null,operationProduct=null,scannerMode='inventory',scanCandidateCode='',scanCandidateCount=0,scanCandidateLastAt=0,scanCandidateFormat='';
+const KEY='dj_lager_v8';
+let state={products:[],locations:['Salon','Keller'],history:[],inventories:[],activeInventoryId:null,theme:'dark'};
+let scannerMode='stock',scannerActive=false,scanCandidate='',scanCount=0,scanLastAt=0,scanConfirming=false,pendingBarcode='',dialogProduct=null,activeProductId=null;
 
 const num=v=>{const x=Number(String(v??'').replace(',','.'));return Number.isFinite(x)?x:0};
 const tx=v=>String(v??'').trim();
 const euro=v=>new Intl.NumberFormat('de-DE',{style:'currency',currency:'EUR'}).format(v||0);
-const total=p=>Object.values(p.counts||{}).reduce((a,b)=>a+num(b),0);
-const diff=p=>total(p)-p.expected;
-const stockTotal=p=>Object.values(p.stockByLocation||{}).reduce((a,b)=>a+num(b),0);
-const roleLabels={retail:'Kundenverkauf',employee:'Mitarbeiter',cabinet:'Kabinett',asset:'Inventar'};
-function ensureProductModel(p){
- if(!p.brand)p.brand='';
- if(!p.group)p.group='';
- if(!Array.isArray(p.roles))p.roles=['retail'];
- if(!p.employeePricing)p.employeePricing='ek_vat';
- if(!('vatRate' in p))p.vatRate=19;
- if(!('employeePrice' in p))p.employeePrice=0;
- if(!('assetCount' in p))p.assetCount=0;
- if(!p.stockByLocation){
-   p.stockByLocation={};
-   // Migration: old app used counts as both stock/inventory. Prefer existing non-zero counts, otherwise imported expected stock in Salon.
-   const old=Object.values(p.counts||{}).reduce((a,b)=>a+num(b),0);
-   if(old>0) locations.forEach(l=>p.stockByLocation[l]=num((p.stockByLocation||{})[l]));
-   else p.stockByLocation[locations[0]||'Salon']=Math.max(0,num(p.expected));
- }
- locations.forEach(l=>{if(!(l in p.stockByLocation))p.stockByLocation[l]=0});
- ensureCabinetFields(p);
-}
-function employeeUnitPrice(p){
- ensureProductModel(p);
- return p.employeePricing==='fixed' ? Math.max(0,num(p.employeePrice)) : Math.max(0,num(p.buy))*(1+Math.max(0,num(p.vatRate))/100);
-}
-function purposeChips(p){
- ensureProductModel(p);
- return p.roles.map(r=>`<span class="usage-chip">${roleLabels[r]||r}</span>`).join('');
-}
-
 const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+const uid=()=>crypto.randomUUID?crypto.randomUUID():String(Date.now())+Math.random();
+const now=()=>new Date().toISOString();
+const stockTotal=p=>Object.values(p.stockByLocation||{}).reduce((a,b)=>a+num(b),0);
+const roleLabels={retail:'Kundenverkauf',employee:'MA Verkauf',cabinet:'Kabinettware',asset:'Inventar'};
 
-function toast(t){$('toast').textContent=t;$('toast').classList.remove('hidden');setTimeout(()=>$('toast').classList.add('hidden'),1500)}
-function save(){localStorage.setItem(KEY,JSON.stringify({products,locations,recent,usageLog,employeeSaleLog,assetLog}));$('saveBadge').textContent='Gespeichert'}
-function load(){try{const d=JSON.parse(localStorage.getItem(KEY)||'null');if(d){products=d.products||[];locations=d.locations?.length?d.locations:['Salon','Keller'];recent=d.recent||[];usageLog=d.usageLog||[];employeeSaleLog=d.employeeSaleLog||[];assetLog=d.assetLog||[]}}catch(e){}}
-function go(p){document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));document.querySelectorAll('.nav-item').forEach(x=>x.classList.remove('active'));$('page-'+p).classList.add('active');document.querySelector(`.nav-item[data-page="${p}"]`)?.classList.add('active');const names={dashboard:['Dashboard','Dein Lagerbestand auf einen Blick.'],inventory:['Inventur','Scannen, zählen und direkt vergleichen.'],operations:['Betrieb','Kabinettware und Verbrauch erfassen.'],articles:['Lagerbestand','Produkte, Preise und Mindestbestände.'],locations:['Lagerorte','Bestände nach Bereichen.'],stats:['Auswertung','Lagerwerte und Bestellbedarf.'],history:['Historie','Abgeschlossene Inventuren.'],settings:['Einstellungen','App und lokale Daten verwalten.']};$('pageHeading').textContent=names[p][0];$('pageSubheading').textContent=names[p][1];window.scrollTo({top:0,behavior:'smooth'})}
-function find(q){q=tx(q).toLowerCase();return products.find(p=>(p.barcode||'').toLowerCase()===q)||products.find(p=>p.name.toLowerCase().includes(q))}
-function detect(r,names){const ks=Object.keys(r);for(const n of names){let k=ks.find(x=>x.toLowerCase().replace(/[\s_-]/g,'')===n.toLowerCase().replace(/[\s_-]/g,''));if(k)return r[k]}for(const k of ks){if(names.some(n=>k.toLowerCase().includes(n.toLowerCase())))return r[k]}return''}
-function mapRows(rows){
- products=rows.map((r,i)=>{
-   const name=tx(detect(r,['Artikel','Artikelname','Produkt','Produktname','Bezeichnung','Name']))||'Unbenannter Artikel';
-   const brand=tx(detect(r,['Produktmarke','Marke','Hersteller']));
-   const group=tx(detect(r,['Produktgruppe','Kategorie','Gruppe']));
-   const expected=num(String(detect(r,['Bestand','Soll','Lagerbestand','Warenbestand','Menge','Stock'])).replace(/[^\d,.-]/g,''));
-   const buy=num(String(detect(r,['Einkaufspreis','EK','Purchase Price'])).replace(/[^\d,.-]/g,''));
-   const sell=num(String(detect(r,['Preis','Verkaufspreis','VK','Retail Price'])).replace(/[^\d,.-]/g,''));
-   const barcode=tx(detect(r,['Barcode','EAN','GTIN','Artikelnummer','Code']));
-   const roles=[];
-   if(/mitarbeiter/i.test(name))roles.push('employee');
-   if(/farbe/i.test(group))roles.push('cabinet');
-   if(!roles.length)roles.push('retail');
+function toast(t){$('toast').textContent=t;$('toast').classList.remove('hidden');setTimeout(()=>$('toast').classList.add('hidden'),1600)}
+function save(){localStorage.setItem(KEY,JSON.stringify(state));$('saveBadge').textContent='Gespeichert'}
+function load(){try{const s=JSON.parse(localStorage.getItem(KEY)||'null');if(s)state={...state,...s}}catch(e){} document.documentElement.dataset.theme=state.theme}
+function ensureProduct(p){
+ p.brand=p.brand||'';p.group=p.group||'';p.barcode=p.barcode||'';p.buy=num(p.buy);p.sell=num(p.sell);p.min=num(p.min);p.roles=Array.isArray(p.roles)?p.roles:['retail'];p.employeePricing=p.employeePricing||'ek_vat';p.vatRate=('vatRate'in p)?num(p.vatRate):19;p.employeePrice=num(p.employeePrice);p.assetCount=num(p.assetCount);p.packageGrams=num(p.packageGrams);p.stockByLocation=p.stockByLocation||{};state.locations.forEach(l=>{if(!(l in p.stockByLocation))p.stockByLocation[l]=0});if(!('cabinetOpen'in p))p.cabinetOpen=null;
+}
+function addHistory(type,p,delta=0,unit='Stk.',details={}){
+ const item={id:uid(),date:now(),type,productId:p?.id||'',productName:p?.name||details.productName||'',delta,unit,...details};
+ state.history.unshift(item);save();
+}
+function go(page){
+ document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
+ document.querySelectorAll('.nav-item').forEach(x=>x.classList.remove('active'));
+ $('page-'+page).classList.add('active');
+ document.querySelector(`.nav-item[data-page="${page}"]`)?.classList.add('active');
+ const labels={dashboard:['Dashboard','Lager, Betrieb und Inventuren sauber getrennt.'],operations:['Betrieb','Kabinettware, MA-Verkauf und Inventar.'],stock:['Lagerbestand','Der aktuelle operative Bestand.'],inventory:['Inventur','Eigene benannte Snapshots des Lagerbestands.'],history:['Historie','Alle Warenbewegungen nachvollziehen.'],settings:['Einstellungen','Lagerorte und lokale Daten.']};
+ $('pageHeading').textContent=labels[page][0];$('pageSubheading').textContent=labels[page][1];render();window.scrollTo({top:0,behavior:'smooth'})
+}
+function findProduct(q){q=tx(q).toLowerCase();return state.products.find(p=>(p.barcode||'').toLowerCase()===q)||state.products.find(p=>p.name.toLowerCase().includes(q))}
+function roles(p){return p.roles.map(r=>`<span class="usage-chip">${roleLabels[r]||r}</span>`).join('')}
 
-   const stockByLocation={};
-   stockByLocation[locations[0]||'Salon']=Math.max(0,expected);
-
-   return {
-     id:crypto.randomUUID?crypto.randomUUID():'p'+i,
-     name,brand,group,barcode,
-     expected:Math.max(0,expected),
-     buy:Math.max(0,buy),sell:Math.max(0,sell),min:0,
-     unit:roles.includes('cabinet')?'gram':'piece',
-     packageGrams:0,cabinetOpen:null,
-     roles,
-     employeePricing:'ek_vat',vatRate:19,employeePrice:0,
-     assetCount:0,
-     stockByLocation,
-     counts:{}
-   };
- }).filter(p=>p.name);
- recent=[];
- save();render();
- toast(products.length+' Artikel aus CSV geladen');
- go('articles');
+function render(){state.products.forEach(ensureProduct);renderDashboard();renderStock();renderInventorySessions();renderOperations();renderHistory();renderSettings()}
+function renderDashboard(){
+ $('dashProducts').textContent=state.products.length;
+ $('dashStockValue').textContent=euro(state.products.reduce((a,p)=>a+stockTotal(p)*p.buy,0));
+ $('dashCabinet').textContent=state.products.filter(p=>p.cabinetOpen).length;
+ $('dashAssets').textContent=state.products.reduce((a,p)=>a+p.assetCount,0);
+ $('dashHistory').innerHTML=state.history.length?state.history.slice(0,7).map(historyRow).join(''):'Noch keine Bewegungen.';
+ $('dashInventories').innerHTML=state.inventories.length?state.inventories.slice(0,6).map(i=>`<div class="activity-row"><div><strong>${esc(i.name)}</strong><small>${new Date(i.createdAt).toLocaleString('de-DE')}</small></div><span class="status ${i.status==='done'?'done':''}">${i.status==='done'?'abgeschlossen':'offen'}</span></div>`).join(''):'Noch keine Inventur.'
 }
-function demo(){products=[
-{id:'1',name:'Shampoo Repair 250 ml',barcode:'4000000000011',expected:10,buy:6.2,sell:14.9,min:4,counts:{Salon:5}},
-{id:'2',name:'Conditioner Color 200 ml',barcode:'4000000000028',expected:6,buy:7.1,sell:16.9,min:3,counts:{Salon:6}},
-{id:'3',name:'Haarspray Strong 300 ml',barcode:'4000000000035',expected:8,buy:5.7,sell:13.5,min:3,counts:{Keller:3}},
-{id:'4',name:'Styling Paste Matt 100 ml',barcode:'4000000000042',expected:4,buy:8.4,sell:18.9,min:2,counts:{}},
-{id:'5',name:'Haaröl Premium 100 ml',barcode:'4000000000059',expected:5,buy:9.8,sell:22.5,min:2,unit:'piece',packageGrams:0,cabinetOpen:null,counts:{Salon:2,Keller:2}},
-{id:'6',name:'Color Creme 6/0 60 g',barcode:'4000000000066',expected:12,buy:5.1,sell:11.9,min:4,unit:'gram',packageGrams:60,cabinetOpen:{location:'Salon',remainingGrams:42,openedAt:new Date().toISOString(),usedGrams:18},counts:{Salon:11}},
-{id:'7',name:'Color Creme 7/1 60 g',barcode:'4000000000073',expected:8,buy:5.1,sell:11.9,min:3,unit:'gram',packageGrams:60,cabinetOpen:null,counts:{Salon:8}}
-];recent=[{name:'Haaröl Premium 100 ml',qty:2,loc:'Keller',at:'10:18'},{name:'Conditioner Color 200 ml',qty:6,loc:'Salon',at:'10:12'}];save();render();toast('Demo-Daten geladen')}
-function renderLocations(){
- const s=$('locationSelect'),cur=s.value;
- s.innerHTML=locations.map(l=>`<option>${esc(l)}</option>`).join('');
- if(locations.includes(cur))s.value=cur;
- const ss=$('scanLocation'); if(ss){const cur2=ss.value;ss.innerHTML=locations.map(l=>`<option>${esc(l)}</option>`).join(''); if(locations.includes(cur2))ss.value=cur2; else if(locations.includes(s.value))ss.value=s.value}
+function productCard(p){
+ return `<article class="product-card" data-product="${esc(p.id)}"><h4>${esc(p.name)}</h4><div class="meta">${esc(p.brand||'–')} · ${esc(p.group||'–')} · ${esc(p.barcode||'kein Barcode')}</div><div class="usage-chips">${roles(p)}</div><div class="numbers"><div><small>Lager</small><strong>${stockTotal(p)}</strong></div><div><small>Inventar</small><strong>${p.assetCount}</strong></div><div><small>EK</small><strong>${euro(p.buy)}</strong></div></div></article>`
 }
-
-function attachEditHandlers(){
- document.querySelectorAll('[data-edit-product]').forEach(el=>{
-   el.addEventListener('click',e=>{
-     if(e.target.closest('button,input,select'))return;
-     const p=products.find(x=>String(x.id)===String(el.dataset.editProduct));
-     if(p)openEditProduct(p);
-   });
- });
-}
-
-
-function openNewArticle(){
- const p={
-   id:crypto.randomUUID?crypto.randomUUID():String(Date.now()),
-   name:'',
-   brand:'',
-   group:'',
-   barcode:'',
-   expected:0,
-   buy:0,
-   sell:0,
-   min:0,
-   unit:'piece',
-   packageGrams:0,
-   cabinetOpen:null,
-   roles:['retail'],employeePricing:'ek_vat',vatRate:19,employeePrice:0,assetCount:0,
-   stockByLocation:{},
-   counts:{}
- };
- locations.forEach(loc=>{p.stockByLocation[loc]=0;p.counts[loc]=0});
- editProduct=p;
-
- $('epTitle').textContent='Neuer Artikel';
- $('epName').value='';
- $('epBarcode').value='';
- $('epBrand').value='';$('epGroup').value='';
- $('epExpected').value=0;
- $('epMin').value=0;
- $('epBuy').value=0;
- $('epSell').value=0;
- $('roleRetail').checked=true;$('roleEmployee').checked=false;$('roleCabinet').checked=false;$('roleAsset').checked=false;
- $('epEmployeePricing').value='ek_vat';$('epVatRate').value=19;$('epEmployeePrice').value=0;$('epAssetCount').value=0;
-
- $('epLocations').innerHTML=locations.map(loc=>`
-   <label class="edit-location-row">
-     <strong>${esc(loc)}</strong>
-     <input type="number" min="0" step="1" value="0" data-ep-location="${esc(loc)}">
-   </label>
- `).join('');
-
- updateEditSummary();
- $('epLocations').querySelectorAll('input[data-ep-location]').forEach(i=>i.addEventListener('input',updateEditSummary));
- $('editProductDialog').dataset.mode='new';
- $('editProductDialog').showModal();
-}
-function openEditProduct(p){
- editProduct=p;
- ensureProductModel(p);
- $('editProductDialog').dataset.mode='edit';
- $('epTitle').textContent=p.name;
- $('epName').value=p.name;
- $('epBarcode').value=p.barcode||'';
- $('epBrand').value=p.brand||'';$('epGroup').value=p.group||'';
- $('epExpected').value=p.expected||0;
- $('epMin').value=p.min||0;
- $('epBuy').value=p.buy||0;
- $('epSell').value=p.sell||0;
- ensureCabinetFields(p);
- $('epUnit').value=p.unit||'piece';
- $('epPackageGrams').value=p.packageGrams||0;
- $('roleRetail').checked=p.roles.includes('retail');$('roleEmployee').checked=p.roles.includes('employee');$('roleCabinet').checked=p.roles.includes('cabinet');$('roleAsset').checked=p.roles.includes('asset');
- $('epEmployeePricing').value=p.employeePricing||'ek_vat';$('epVatRate').value=p.vatRate??19;$('epEmployeePrice').value=p.employeePrice||0;$('epAssetCount').value=p.assetCount||0;
-
- $('epLocations').innerHTML=locations.map(loc=>`
-   <label class="edit-location-row">
-     <strong>${esc(loc)}</strong>
-     <input type="number" min="0" step="1" value="${num((p.stockByLocation||{})[loc])}" data-ep-location="${esc(loc)}">
-   </label>
- `).join('');
- updateEditSummary();
- $('epLocations').querySelectorAll('input[data-ep-location]').forEach(i=>i.addEventListener('input',updateEditSummary));
- ['epExpected','epBuy'].forEach(id=>$(id).addEventListener('input',updateEditSummary,{once:true}));
- $('editProductDialog').showModal();
-}
-
-function updateEditSummary(){
- if(!editProduct)return;
- const counts={};
- $('epLocations').querySelectorAll('input[data-ep-location]').forEach(i=>counts[i.dataset.epLocation]=Math.max(0,num(i.value)));
- const t=Object.values(counts).reduce((a,b)=>a+b,0),
-       expected=Math.max(0,num($('epExpected').value)),
-       d=t-expected,
-       buy=Math.max(0,num($('epBuy').value));
- $('epTotal').textContent=t;
- $('epDiff').textContent=(d>0?'+':'')+d;
- $('epDiff').className=d===0?'diff-good':'diff-bad';
- $('epValue').textContent=euro(t*buy);
-}
-
-function saveEditProduct(){
- if(!editProduct)return;
- const isNew=$('editProductDialog').dataset.mode==='new';
- const name=tx($('epName').value);
- if(!name){toast('Artikelname darf nicht leer sein');return}
- editProduct.name=name;
- editProduct.barcode=tx($('epBarcode').value);
- editProduct.brand=tx($('epBrand').value);editProduct.group=tx($('epGroup').value);
- editProduct.expected=Math.max(0,num($('epExpected').value));
- editProduct.min=Math.max(0,num($('epMin').value));
- editProduct.buy=Math.max(0,num($('epBuy').value));
- editProduct.sell=Math.max(0,num($('epSell').value));
- editProduct.unit=$('epUnit').value||'piece';
- editProduct.packageGrams=Math.max(0,num($('epPackageGrams').value));
- ensureCabinetFields(editProduct);
- editProduct.roles=[];
- if($('roleRetail').checked)editProduct.roles.push('retail');
- if($('roleEmployee').checked)editProduct.roles.push('employee');
- if($('roleCabinet').checked)editProduct.roles.push('cabinet');
- if($('roleAsset').checked)editProduct.roles.push('asset');
- if(!editProduct.roles.length)editProduct.roles=['retail'];
- editProduct.employeePricing=$('epEmployeePricing').value||'ek_vat';
- editProduct.vatRate=Math.max(0,num($('epVatRate').value));
- editProduct.employeePrice=Math.max(0,num($('epEmployeePrice').value));
- editProduct.assetCount=Math.max(0,num($('epAssetCount').value));
- editProduct.stockByLocation=editProduct.stockByLocation||{};
- locations.forEach(loc=>editProduct.stockByLocation[loc]=0);
- $('epLocations').querySelectorAll('input[data-ep-location]').forEach(i=>editProduct.stockByLocation[i.dataset.epLocation]=Math.max(0,num(i.value)));
- editProduct.counts=editProduct.counts||{};
- if(isNew)products.push(editProduct);
- $('editProductDialog').close();
- $('editProductDialog').dataset.mode='edit';
- editProduct=null;
- save();render();toast(isNew?'Artikel angelegt':'Artikel aktualisiert');
-}
-
-function deleteEditProduct(){
- if(!editProduct)return;
- if($('editProductDialog').dataset.mode==='new'){
-   $('editProductDialog').close();
-   editProduct=null;
-   return;
- }
- if(!confirm(`Artikel "${editProduct.name}" wirklich löschen?`))return;
- products=products.filter(p=>String(p.id)!==String(editProduct.id));
- $('editProductDialog').close();
- editProduct=null;
- save();render();toast('Artikel gelöscht');
-}
-
-function ensureCabinetFields(p){
- if(!p.unit)p.unit='piece';
- if(!('packageGrams' in p))p.packageGrams=0;
- if(!('cabinetOpen' in p))p.cabinetOpen=null;
-}
-function isCabinetProduct(p){
- ensureCabinetFields(p);
- return p.unit==='gram' || p.packageGrams>0;
-}
-function cabinetRemaining(p){
- return p.cabinetOpen ? Math.max(0,num(p.cabinetOpen.remainingGrams)) : 0;
-}
-function cabinetUsed(p){
- return p.cabinetOpen ? Math.max(0,num(p.cabinetOpen.usedGrams)) : 0;
-}
-function todayKey(d=new Date()){
- return d.toISOString().slice(0,10);
-}
-
-function setOperationMode(mode){
- document.querySelectorAll('.operation-mode').forEach(b=>b.classList.toggle('active',b.dataset.opmode===mode));
- document.querySelectorAll('.operation-panel').forEach(p=>p.classList.remove('active'));
- $('op-'+mode)?.classList.add('active');
-}
-function renderEmployeeAndAssets(){
- const emp=$('employeeSaleHistory');
- if(emp)emp.innerHTML=employeeSaleLog.length?employeeSaleLog.slice(0,12).map(x=>`<div class="activity-row"><div><strong>${esc(x.productName)}</strong><small style="display:block;color:#777">${esc(x.employee||'Mitarbeiter')} · ${esc(x.location)} · ${new Date(x.date).toLocaleString('de-DE')}</small></div><b style="color:var(--gold2)">${x.qty} × ${euro(x.unitPrice)}</b></div>`).join(''):'Noch keine Mitarbeiterverkäufe.';
- const al=$('assetList');
- if(al){
-   const assets=products.filter(p=>(p.assetCount||0)>0);
-   al.innerHTML=assets.length?assets.map(p=>`<div class="activity-row" data-edit-product="${esc(p.id)}"><div><strong>${esc(p.name)}</strong><small style="display:block;color:#777">${esc(p.brand||'')} ${esc(p.group||'')}</small></div><b class="asset-badge">${p.assetCount} Stk.</b></div>`).join(''):'Noch keine Arbeitsmittel ausgegeben.';
- }
- renderRoleSuggestions('employee');
- renderRoleSuggestions('asset');
-}
-function roleEligible(p,role){
- ensureProductModel(p);
- return p.roles.includes(role);
-}
-function renderRoleSuggestions(kind){
- const input=$(kind==='employee'?'employeeSearch':'assetSearch'),box=$(kind==='employee'?'employeeSuggestions':'assetSuggestions');
- if(!input||!box)return;
- const q=tx(input.value).toLowerCase();
- if(!q){box.classList.add('hidden');box.innerHTML='';return}
- const role=kind==='employee'?'employee':'asset';
- const list=products.filter(p=>roleEligible(p,role)).filter(p=>p.name.toLowerCase().includes(q)||(p.barcode||'').includes(q)).slice(0,8);
- box.innerHTML=list.length?list.map(p=>`<button class="suggestion-item" data-role-pick="${esc(p.id)}" data-kind="${kind}"><div><strong>${esc(p.name)}</strong><small>${esc(p.barcode||'kein Barcode')} · Lager ${stockTotal(p)}</small></div><span class="suggestion-stock">${kind==='employee'?euro(employeeUnitPrice(p)):(p.assetCount||0)+' Inventar'}</span></button>`).join(''):'<div style="padding:12px;color:#777">Keine passenden Artikel.</div>';
- box.classList.remove('hidden');
- box.querySelectorAll('[data-role-pick]').forEach(b=>b.addEventListener('click',()=>{
-   const p=products.find(x=>String(x.id)===String(b.dataset.rolePick));
-   box.classList.add('hidden');
-   if(p)(kind==='employee'?openEmployeeSale(p):openAssetIssue(p));
- }));
-}
-function fillLocationSelect(id,p){
- const s=$(id);s.innerHTML=locations.map(l=>`<option value="${esc(l)}">${esc(l)} (${num((p.stockByLocation||{})[l])} verfügbar)</option>`).join('');
-}
-function openEmployeeSale(p){
- ensureProductModel(p);operationProduct=p;
- if(!p.roles.includes('employee')){toast('Artikel ist nicht für Mitarbeiterverkauf freigegeben');return}
- if(stockTotal(p)<=0){toast('Kein Lagerbestand verfügbar');return}
- $('esName').textContent=p.name;$('esMeta').textContent=(p.barcode||'kein Barcode')+' · Lager '+stockTotal(p);
- fillLocationSelect('esLocation',p);$('esQty').value=1;$('esPrice').value=employeeUnitPrice(p).toFixed(2);$('esEmployee').value='';
- $('esEk').textContent=euro(p.buy);updateEmployeeSaleTotal();$('employeeSaleDialog').showModal();
-}
-function updateEmployeeSaleTotal(){
- if(!operationProduct)return;
- const price=Math.max(0,num($('esPrice').value)),qty=Math.max(1,num($('esQty').value));
- $('esUnitPrice').textContent=euro(price);$('esTotalPrice').textContent=euro(price*qty);
-}
-function saveEmployeeSale(){
- if(!operationProduct)return;
- const p=operationProduct,loc=$('esLocation').value,qty=Math.max(1,num($('esQty').value)),available=num(p.stockByLocation[loc]);
- if(qty>available){toast('Nicht genug Bestand in '+loc);return}
- const price=Math.max(0,num($('esPrice').value));
- p.stockByLocation[loc]=available-qty;
- employeeSaleLog.unshift({productId:p.id,productName:p.name,qty,unitPrice:price,location:loc,employee:tx($('esEmployee').value),date:new Date().toISOString()});
- $('employeeSaleDialog').close();operationProduct=null;save();render();toast('Mitarbeiterverkauf gebucht');
-}
-function openAssetIssue(p){
- ensureProductModel(p);operationProduct=p;
- if(!p.roles.includes('asset')){toast('Artikel ist nicht als Arbeitsmittel freigegeben');return}
- if(stockTotal(p)<=0){toast('Kein Lagerbestand verfügbar');return}
- $('asName').textContent=p.name;$('asMeta').textContent=(p.barcode||'kein Barcode')+' · Lager '+stockTotal(p);
- fillLocationSelect('asLocation',p);$('asQty').value=1;$('asArea').value='';$('asNote').value='';$('assetDialog').showModal();
-}
-function saveAssetIssue(){
- if(!operationProduct)return;
- const p=operationProduct,loc=$('asLocation').value,qty=Math.max(1,num($('asQty').value)),available=num(p.stockByLocation[loc]);
- if(qty>available){toast('Nicht genug Bestand in '+loc);return}
- p.stockByLocation[loc]=available-qty;p.assetCount=num(p.assetCount)+qty;
- assetLog.unshift({productId:p.id,productName:p.name,qty,location:loc,area:tx($('asArea').value),note:tx($('asNote').value),date:new Date().toISOString()});
- $('assetDialog').close();operationProduct=null;save();render();toast('Als Salon-Inventar ausgegeben');
-}
-function startRoleScanner(kind){
- window._roleScanMode=kind;
- openFullScanner('inventory');
-}
-function openAssignBarcode(){
- $('unknownBarcodeDialog').close();
- $('assignBarcodeValue').textContent=pendingUnknownBarcode;
- $('assignSearch').value='';
- renderAssignResults();
- $('assignBarcodeDialog').showModal();
-}
-function renderAssignResults(){
- const q=tx($('assignSearch').value).toLowerCase();
- const list=products.filter(p=>!q||p.name.toLowerCase().includes(q)||(p.brand||'').toLowerCase().includes(q)||(p.group||'').toLowerCase().includes(q)).slice(0,40);
- $('assignResults').innerHTML=list.map(p=>`<div class="assign-result" data-assign-id="${esc(p.id)}"><strong>${esc(p.name)}</strong><small>${esc(p.brand||'–')} · ${esc(p.group||'–')} · ${p.barcode?'Barcode '+esc(p.barcode):'noch kein Barcode'}</small></div>`).join('');
- $('assignResults').querySelectorAll('[data-assign-id]').forEach(el=>el.addEventListener('click',()=>{
-   const p=products.find(x=>String(x.id)===String(el.dataset.assignId));if(!p)return;
-   p.barcode=pendingUnknownBarcode;
-   const name=p.name;
-   pendingUnknownBarcode='';
-   $('assignBarcodeDialog').close();save();render();toast('Barcode mit '+name+' verknüpft');
- }));
+function attachProductOpen(root=document){root.querySelectorAll('[data-product]').forEach(el=>el.addEventListener('click',()=>{const p=state.products.find(x=>x.id===el.dataset.product);if(p)openProductDialog(p)}))}
+function renderStock(){
+ const q=tx($('stockSearch')?.value||'').toLowerCase();
+ const list=state.products.filter(p=>!q||p.name.toLowerCase().includes(q)||p.brand.toLowerCase().includes(q)||p.group.toLowerCase().includes(q)||p.barcode.includes(q));
+ $('stockCards').innerHTML=list.length?list.map(productCard).join(''):'<p class="muted">Keine Artikel.</p>';
+ attachProductOpen($('stockCards'))
 }
 function renderOperations(){
- products.forEach(ensureProductModel);
- const cabinet=products.filter(isCabinetProduct);
- const open=cabinet.filter(p=>p.cabinetOpen && cabinetRemaining(p)>0);
- const today=todayKey();
- const logsToday=usageLog.filter(x=>(x.date||'').slice(0,10)===today);
- const usedToday=logsToday.filter(x=>x.type==='use').reduce((a,x)=>a+num(x.grams),0);
- const wasteToday=logsToday.filter(x=>x.type==='waste').reduce((a,x)=>a+num(x.grams),0);
- const emptyToday=logsToday.filter(x=>x.type==='empty').length;
-
- $('cabOpenCount').textContent=open.length;
- $('cabTodayGrams').textContent=Math.round(usedToday)+' g';
- $('cabWasteToday').textContent=Math.round(wasteToday)+' g';
- $('cabEmptyToday').textContent=emptyToday;
-
- $('openCabinetList').innerHTML=open.length?open.map(p=>{
-   const rem=cabinetRemaining(p),pkg=Math.max(1,num(p.packageGrams)),pct=Math.max(0,Math.min(100,Math.round(rem/pkg*100)));
-   return `<div class="cabinet-item" data-cabinet-id="${esc(p.id)}">
-     <div class="cabinet-item-top">
-       <div><strong>${esc(p.name)}</strong><small>${esc(p.cabinetOpen.location||'Salon')} · ${Math.round(pct)} % Rest</small></div>
-       <strong>${Math.round(rem)} g</strong>
-     </div>
-     <div class="cabinet-progress"><i style="width:${pct}%"></i></div>
-   </div>`
- }).join(''):'Noch keine Kabinettware geöffnet.';
-
- $('usageHistory').innerHTML=usageLog.length?usageLog.slice(0,10).map(x=>`
-   <div class="activity-row">
-     <div><strong>${esc(x.productName)}</strong><small style="display:block;color:#777">${esc(x.location||'')} · ${new Date(x.date).toLocaleString('de-DE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}${x.note?' · '+esc(x.note):''}</small></div>
-     <b style="color:${x.type==='waste'?'var(--danger)':x.type==='empty'?'var(--good)':'var(--gold2)'}">${x.type==='empty'?'leer':(x.type==='waste'?'-':'-')+Math.round(num(x.grams))+' g'}</b>
-   </div>`).join(''):'Noch kein Verbrauch erfasst.';
-
- const q=tx($('cabinetSearch')?.value||'').toLowerCase();
- const list=cabinet.filter(p=>!q||p.name.toLowerCase().includes(q)||(p.barcode||'').includes(q));
- $('cabinetProductCards').innerHTML=list.length?list.map(p=>`
-   <article class="cabinet-product-card" data-cabinet-id="${esc(p.id)}">
-     <span class="cab-tag">${p.cabinetOpen?'offen':'geschlossen'}</span>
-     <h4>${esc(p.name)}</h4>
-     <div class="meta">${esc(p.barcode||'–')}</div>
-     <div class="numbers">
-       <div><small>VE</small><strong>${Math.round(num(p.packageGrams))} g</strong></div>
-       <div><small>Rest offen</small><strong>${Math.round(cabinetRemaining(p))} g</strong></div>
-       <div><small>Stückbestand</small><strong>${total(p)}</strong></div>
-     </div>
-   </article>`).join(''):'<p style="color:#777">Keine Kabinettware gefunden.</p>';
-
- document.querySelectorAll('[data-cabinet-id]').forEach(el=>el.addEventListener('click',()=>{
-   const p=products.find(x=>String(x.id)===String(el.dataset.cabinetId));
-   if(p)openCabinetUsageFlow(p);
- }));
- renderCabinetSuggestions();
-
- renderEmployeeAndAssets();
+ $('operationStockCards').innerHTML=state.products.slice(0,12).map(productCard).join('')||'<p class="muted">Keine Artikel.</p>';
+ attachProductOpen($('operationStockCards'));
+ const open=state.products.filter(p=>p.cabinetOpen);
+ $('openCabinetList').innerHTML=open.length?open.map(p=>{const rem=num(p.cabinetOpen.remainingGrams),pkg=Math.max(1,p.packageGrams),pct=Math.round(rem/pkg*100);return `<div class="cabinet-item" data-cabinet="${p.id}"><div class="cabinet-item-top"><div><strong>${esc(p.name)}</strong><small>${esc(p.cabinetOpen.location)} · ${pct}% Rest</small></div><strong>${Math.round(rem)} g</strong></div><div class="cabinet-progress"><i style="width:${Math.max(0,Math.min(100,pct))}%"></i></div></div>`}).join(''):'Noch keine offene Kabinettware.';
+ document.querySelectorAll('[data-cabinet]').forEach(el=>el.addEventListener('click',()=>openCabinet(state.products.find(p=>p.id===el.dataset.cabinet))));
+ $('cabinetHistory').innerHTML=filterHistoryTypes(['cabinet_open','cabinet_use','cabinet_waste','cabinet_empty']).slice(0,8).map(historyRow).join('')||'Noch keine Bewegung.';
+ $('employeeHistory').innerHTML=filterHistoryTypes(['employee_sale']).slice(0,10).map(historyRow).join('')||'Noch keine Verkäufe.';
+ const assets=state.products.filter(p=>p.assetCount>0);
+ $('assetList').innerHTML=assets.length?assets.map(p=>`<div class="activity-row" data-asset="${p.id}"><div><strong>${esc(p.name)}</strong><small>${esc(p.brand||'')} · ${esc(p.group||'')}</small></div><strong>${p.assetCount} Stk.</strong></div>`).join(''):'Noch keine Arbeitsmittel.';
+ document.querySelectorAll('[data-asset]').forEach(el=>el.addEventListener('click',()=>openAssetRemove(state.products.find(p=>p.id===el.dataset.asset))))
 }
-function renderCabinetSuggestions(){
- const box=$('cabinetSuggestions'); if(!box)return;
- const q=tx($('cabinetSearch').value).toLowerCase();
- if(!q){box.classList.add('hidden');box.innerHTML='';return}
- const list=products.filter(isCabinetProduct).filter(p=>p.name.toLowerCase().includes(q)||(p.barcode||'').includes(q)).slice(0,7);
- box.innerHTML=list.length?list.map(p=>`<button class="suggestion-item" data-cab-suggestion="${esc(p.id)}"><div><strong>${esc(p.name)}</strong><small>${esc(p.barcode||'–')} · ${Math.round(num(p.packageGrams))} g/VE</small></div><span class="suggestion-stock">${p.cabinetOpen?Math.round(cabinetRemaining(p))+' g Rest':'geschlossen'}</span></button>`).join(''):'<div style="padding:12px;color:#777">Keine Kabinettware gefunden.</div>';
- box.classList.remove('hidden');
- box.querySelectorAll('[data-cab-suggestion]').forEach(b=>b.addEventListener('click',()=>{
-   const p=products.find(x=>String(x.id)===String(b.dataset.cabSuggestion));
-   box.classList.add('hidden'); if(p)openCabinetUsageFlow(p);
- }));
+function filterHistoryTypes(types){return state.history.filter(h=>types.includes(h.type))}
+function historyLabel(t){return {stock_import:'Bestandsimport',employee_sale:'MA Verkauf',cabinet_open:'Kabinett geöffnet',cabinet_use:'Kabinettverbrauch',cabinet_waste:'Schwund / Verlust',cabinet_empty:'Gebinde leer',asset_issue:'Ins Inventar',asset_remove:'Aus Inventar',asset_return:'Zurück ins Lager',stock_adjust:'Bestandsänderung'}[t]||t}
+function historyRow(h){const cls=num(h.delta)>0?'positive':num(h.delta)<0?'negative':'';return `<div class="history-row"><div><span class="history-type">${esc(historyLabel(h.type))}</span><strong>${esc(h.productName||'–')}</strong><small>${new Date(h.date).toLocaleString('de-DE')} · ${esc(h.location||h.area||'')}${h.reason?' · '+esc(h.reason):''}${h.note?' · '+esc(h.note):''}</small></div><span class="history-delta ${cls}">${h.delta?((h.delta>0?'+':'')+h.delta+' '+esc(h.unit||'')):''}</span></div>`}
+function renderHistory(){
+ const q=tx($('historySearch')?.value||'').toLowerCase(),type=$('historyType')?.value||'';
+ const list=state.history.filter(h=>(!type||h.type===type)&&(!q||JSON.stringify(h).toLowerCase().includes(q)));
+ $('historyList').innerHTML=list.length?list.map(historyRow).join(''):'Noch keine passenden Bewegungen.'
 }
-function openCabinetUsageFlow(p){
- ensureCabinetFields(p);
- if(!isCabinetProduct(p)){
-   p.unit='gram';
-   if(!p.packageGrams)p.packageGrams=60;
- }
- if(!p.cabinetOpen){
-   pendingCabinetProduct=p;
-   $('coName').textContent=p.name;
-   $('coPackageGrams').value=p.packageGrams||60;
-   renderCabinetLocationOptions('coLocation');
-   $('cabinetOpenDialog').showModal();
-   return;
- }
- openCabinetUsage(p);
+function renderSettings(){$('locationList').innerHTML=state.locations.map(l=>`<div class="activity-row"><strong>${esc(l)}</strong><span>${state.products.reduce((a,p)=>a+num(p.stockByLocation[l]),0)} Stk.</span></div>`).join('')}
+function setOpMode(mode){document.querySelectorAll('.operation-mode').forEach(b=>b.classList.toggle('active',b.dataset.opmode===mode));document.querySelectorAll('.operation-panel').forEach(p=>p.classList.remove('active'));$('op-'+mode).classList.add('active')}
+
+function employeePrice(p){return p.employeePricing==='fixed'?p.employeePrice:p.buy*(1+p.vatRate/100)}
+function fillLocations(id,p,showStock=true){const s=$(id);s.innerHTML=state.locations.map(l=>`<option value="${esc(l)}">${esc(l)}${showStock?' ('+num(p?.stockByLocation?.[l])+' verfügbar)':''}</option>`).join('')}
+function openProductDialog(p=null,barcode=''){
+ dialogProduct=p?structuredClone(p):{id:uid(),name:'',brand:'',group:'',barcode,roles:['retail'],buy:0,sell:0,min:0,packageGrams:0,employeePricing:'ek_vat',vatRate:19,employeePrice:0,assetCount:0,stockByLocation:{}};
+ ensureProduct(dialogProduct);
+ $('productDialog').dataset.new=p?'0':'1';$('pdTitle').textContent=p?'Artikel bearbeiten':'Neuer Artikel';$('pdName').value=dialogProduct.name;$('pdBarcode').value=dialogProduct.barcode;$('pdBrand').value=dialogProduct.brand;$('pdGroup').value=dialogProduct.group;$('pdBuy').value=dialogProduct.buy;$('pdSell').value=dialogProduct.sell;$('pdMin').value=dialogProduct.min;$('pdPackageGrams').value=dialogProduct.packageGrams;$('pdRetail').checked=dialogProduct.roles.includes('retail');$('pdEmployee').checked=dialogProduct.roles.includes('employee');$('pdCabinet').checked=dialogProduct.roles.includes('cabinet');$('pdAsset').checked=dialogProduct.roles.includes('asset');$('pdEmployeePricing').value=dialogProduct.employeePricing;$('pdVat').value=dialogProduct.vatRate;$('pdEmployeePrice').value=dialogProduct.employeePrice;$('pdLocations').innerHTML=state.locations.map(l=>`<label class="edit-location-row"><strong>${esc(l)}</strong><input data-pd-loc="${esc(l)}" type="number" min="0" value="${num(dialogProduct.stockByLocation[l])}"></label>`).join('');
+ $('productDialog').showModal()
 }
-function renderCabinetLocationOptions(id){
- const s=$(id); const cur=s.value;
- s.innerHTML=locations.map(l=>`<option>${esc(l)}</option>`).join('');
- if(locations.includes(cur))s.value=cur;
- else if(locations.includes($('locationSelect')?.value))s.value=$('locationSelect').value;
+function saveProduct(){
+ if(!dialogProduct)return;
+ const isNew=$('productDialog').dataset.new==='1',name=tx($('pdName').value);
+ if(!name){toast('Artikelname fehlt');return}
+ dialogProduct.name=name;dialogProduct.barcode=tx($('pdBarcode').value);dialogProduct.brand=tx($('pdBrand').value);dialogProduct.group=tx($('pdGroup').value);dialogProduct.buy=Math.max(0,num($('pdBuy').value));dialogProduct.sell=Math.max(0,num($('pdSell').value));dialogProduct.min=Math.max(0,num($('pdMin').value));dialogProduct.packageGrams=Math.max(0,num($('pdPackageGrams').value));dialogProduct.roles=[];
+ if($('pdRetail').checked)dialogProduct.roles.push('retail');if($('pdEmployee').checked)dialogProduct.roles.push('employee');if($('pdCabinet').checked)dialogProduct.roles.push('cabinet');if($('pdAsset').checked)dialogProduct.roles.push('asset');if(!dialogProduct.roles.length)dialogProduct.roles=['retail'];
+ dialogProduct.employeePricing=$('pdEmployeePricing').value;dialogProduct.vatRate=Math.max(0,num($('pdVat').value));dialogProduct.employeePrice=Math.max(0,num($('pdEmployeePrice').value));dialogProduct.stockByLocation={};document.querySelectorAll('[data-pd-loc]').forEach(i=>dialogProduct.stockByLocation[i.dataset.pdLoc]=Math.max(0,num(i.value)));
+ if(isNew){state.products.push(dialogProduct);addHistory('stock_adjust',dialogProduct,stockTotal(dialogProduct),'Stk.',{reason:'Artikel angelegt'})}
+ else{const old=state.products.find(p=>p.id===dialogProduct.id),before=stockTotal(old);Object.assign(old,dialogProduct);const delta=stockTotal(old)-before;if(delta)addHistory('stock_adjust',old,delta,'Stk.',{reason:'Manuelle Bestandsänderung'})}
+ $('productDialog').close();dialogProduct=null;save();render();toast(isNew?'Artikel angelegt':'Artikel gespeichert')
 }
-function openCabinetUsage(p){
- cabinetProduct=p;
- $('cuName').textContent=p.name;
- $('cuBarcode').textContent='Barcode: '+(p.barcode||'–');
- $('cuPackage').textContent=Math.round(num(p.packageGrams))+' g';
- $('cuRemaining').textContent=Math.round(cabinetRemaining(p))+' g';
- $('cuUsed').textContent=Math.round(cabinetUsed(p))+' g';
- renderCabinetLocationOptions('cuLocation');
- $('cuLocation').value=p.cabinetOpen?.location||$('cuLocation').value;
- $('cuGrams').value=Math.min(10,Math.max(1,Math.round(cabinetRemaining(p))));
- $('cuType').value='use'; $('cuNote').value='';
- $('cabinetUsageDialog').showModal();
-}
-function openNewCabinet(){
- const candidates=products.filter(isCabinetProduct);
- if(!candidates.length){toast('Noch keine Kabinettware angelegt');return}
- go('operations'); $('cabinetSearch').focus();
- toast('Produkt suchen oder Barcode scannen');
-}
-function openCabinetPackage(){
- if(!pendingCabinetProduct)return;
- const p=pendingCabinetProduct;
- const grams=Math.max(1,num($('coPackageGrams').value)),loc=$('coLocation').value||'Salon';
- p.unit='gram';p.packageGrams=grams;
- // Opening a cabinet package consumes one whole VE from physical unopened stock.
- p.stockByLocation=p.stockByLocation||{};
- const available=num(p.stockByLocation[loc]);
- if(available>0)p.stockByLocation[loc]=available-1;
- else{
-   // We allow it, but log negative adjustment avoidance as zero and note discrepancy.
-   p.stockByLocation[loc]=0;
- }
- p.cabinetOpen={location:loc,remainingGrams:grams,usedGrams:0,openedAt:new Date().toISOString()};
- usageLog.unshift({type:'open',productId:p.id,productName:p.name,grams:0,location:loc,date:new Date().toISOString(),note:'Neues Gebinde geöffnet'});
- $('cabinetOpenDialog').close();pendingCabinetProduct=null;
- save();render();openCabinetUsage(p);toast('Neue Kabinettware geöffnet');
-}
-function saveCabinetUse(markEmpty=false){
- if(!cabinetProduct || !cabinetProduct.cabinetOpen)return;
- const p=cabinetProduct,loc=$('cuLocation').value||p.cabinetOpen.location||'Salon';
- let grams=Math.max(0,num($('cuGrams').value)),type=$('cuType').value,note=tx($('cuNote').value);
- const before=cabinetRemaining(p);
- if(markEmpty){
-   // User confirms the package is physically empty. Remaining system grams become variance/waste.
-   if(before>0){
-     usageLog.unshift({type:'empty',productId:p.id,productName:p.name,grams:before,location:loc,date:new Date().toISOString(),note:note||'Gebinde manuell als leer bestätigt'});
-   }
-   p.cabinetOpen.remainingGrams=0;
-   p.cabinetOpen.usedGrams=num(p.packageGrams);
- }else{
-   grams=Math.min(grams,before);
-   p.cabinetOpen.remainingGrams=Math.max(0,before-grams);
-   p.cabinetOpen.usedGrams=num(p.cabinetOpen.usedGrams)+grams;
-   p.cabinetOpen.location=loc;
-   usageLog.unshift({type,productId:p.id,productName:p.name,grams,location:loc,date:new Date().toISOString(),note});
- }
- const becameEmpty=cabinetRemaining(p)<=0;
- if(becameEmpty)p.cabinetOpen=null;
- $('cabinetUsageDialog').close();cabinetProduct=null;
- save();render();
- toast(markEmpty?'Gebinde als leer abgeschlossen':'Verbrauch gespeichert');
-}
-async function startCabinetScanner(){
- await openFullScanner('cabinet');
-}
-function render(){
- products.forEach(ensureProductModel);
- renderLocations();
- const counted=products.filter(p=>total(p)>0).length,diffs=products.filter(p=>total(p)>0&&diff(p)!==0).length,pct=products.length?Math.round(counted/products.length*100):0,value=products.reduce((a,p)=>a+stockTotal(p)*p.buy,0),below=products.filter(p=>p.min&&stockTotal(p)<p.min).length;
- $('dTotal').textContent=products.length;$('dValue').textContent=euro(value);$('dPercent').textContent=pct+' %';$('dDiffs').textContent=diffs;$('dProgressText').textContent=`${counted} von ${products.length} Artikeln`;$('progressBar').style.width=pct+'%';$('ringValue').textContent=pct+'%';$('progressRing').style.background=`conic-gradient(var(--gold2) ${pct*3.6}deg,#28231b 0deg)`;$('activeState').textContent=products.length?'Aktiv':'Bereit';$('belowMin').textContent=below;$('openCount').textContent=Math.max(0,products.length-counted);
- $('recentOverview').innerHTML=recent.length?recent.slice(0,5).map(r=>`<div class="activity-row"><div><strong>${esc(r.name)}</strong><small style="display:block;color:#777">${esc(r.loc)} · ${r.at}</small></div><b style="color:var(--gold)">+${r.qty}</b></div>`).join(''):'Noch nichts erfasst.';
- $('recentOverview').classList.toggle('empty',!recent.length);
- $('locationOverview').innerHTML=locations.map(loc=>{const countedLoc=products.filter(p=>num((p.stockByLocation||{})[loc])>0).length,p=products.length?Math.round(countedLoc/products.length*100):0;return `<div class="location-row"><div class="location-title"><span>${esc(loc)}</span><span>${p}%</span></div><div class="mini-progress"><i style="width:${p}%"></i></div></div>`}).join('')||'Keine Lagerorte.';
- $('inventoryCards').innerHTML=products.length?products.map(p=>productCard(p,true)).join(''):'<p style="color:#777">Noch keine Daten geladen.</p>';
- renderArticles();renderStats();renderLocationsPage();renderHistory();renderOperations();attachEditHandlers()
-}
-function productCard(p,inventory=false){const c=total(p),d=diff(p),cl=c===0?'':d===0?'diff-good':'diff-bad';return `<article class="product-card" data-edit-product="${esc(p.id)}"><h4>${esc(p.name)}</h4><div class="meta">${esc(p.barcode||'ohne Barcode')}</div><div class="numbers"><div><small>Soll</small><strong>${p.expected}</strong></div><div><small>Ist</small><strong>${c}</strong></div><div><small>Diff.</small><strong class="${cl}">${c?(d>0?'+':'')+d:'–'}</strong></div></div></article>`}
+function deleteProduct(){if(!dialogProduct||$('productDialog').dataset.new==='1'){$('productDialog').close();return}if(!confirm('Artikel wirklich löschen?'))return;state.products=state.products.filter(p=>p.id!==dialogProduct.id);$('productDialog').close();dialogProduct=null;save();render();toast('Artikel gelöscht')}
 
-function renderSuggestions(){
- const box=$('searchSuggestions'),q=tx($('articleSearch').value).toLowerCase();
- if(!q){box.classList.add('hidden');box.innerHTML='';return}
- const matches=products.filter(p=>p.name.toLowerCase().includes(q)||(p.barcode||'').toLowerCase().includes(q)).slice(0,7);
- if(!matches.length){box.innerHTML='<div style="padding:12px;color:#777">Kein passender Artikel gefunden.</div>';box.classList.remove('hidden');return}
- box.innerHTML=matches.map(p=>`<button class="suggestion-item" data-id="${p.id}">
-   <div><strong>${esc(p.name)}</strong><small>${esc(p.barcode||'ohne Barcode')}</small></div>
-   <span class="suggestion-stock">Ist ${total(p)}</span>
- </button>`).join('');
- box.classList.remove('hidden');
- box.querySelectorAll('.suggestion-item').forEach(b=>b.addEventListener('click',()=>{
-   const p=products.find(x=>String(x.id)===String(b.dataset.id)); if(!p)return;
-   $('articleSearch').value=p.name; box.classList.add('hidden'); renderArticles();
-   setTimeout(()=>document.querySelector(`[data-product-id="${CSS.escape(String(p.id))}"]`)?.scrollIntoView({behavior:'smooth',block:'center'}),50);
- }));
-}
-async function startArticleScanner(){
- await openFullScanner('inventory');
-}
-async function stopArticleScanner(){
- try{if(articleScanner){await articleScanner.stop();await articleScanner.clear();articleScanner=null}}catch(e){}
- $('articleScannerModal').classList.add('hidden');
-}
-function renderArticles(){
- const q=tx($('articleSearch').value).toLowerCase();
- const list=products.filter(p=>!q||p.name.toLowerCase().includes(q)||(p.barcode||'').includes(q)||(p.brand||'').toLowerCase().includes(q)||(p.group||'').toLowerCase().includes(q));
- $('articleCards').innerHTML=list.length?list.map(p=>{
-   ensureProductModel(p);
-   const c=stockTotal(p),order=Math.max(0,(p.min||0)-c);
-   return `<article class="product-card" data-product-id="${esc(p.id)}" data-edit-product="${esc(p.id)}">
-     <h4>${esc(p.name)}</h4>
-     <div class="meta">${esc(p.brand||'–')} · ${esc(p.group||'–')} · ${esc(p.barcode||'kein Barcode')}</div>
-     <div class="usage-chips">${purposeChips(p)}</div>
-     <div class="numbers">
-       <div><small>Lager</small><strong>${c}</strong></div>
-       <div><small>Inventar</small><strong>${p.assetCount||0}</strong></div>
-       <div><small>Nachbest.</small><strong class="${order?'diff-bad':'diff-good'}">${order||'OK'}</strong></div>
-     </div>
-   </article>`
- }).join(''):'<p style="color:#777">Keine Artikel.</p>';
- attachEditHandlers();
-}
-function renderStats(){let ev=0,cv=0,rv=0;products.forEach(p=>{ev+=p.expected*p.buy;cv+=stockTotal(p)*p.buy;rv+=stockTotal(p)*p.sell});$('sExpected').textContent=euro(ev);$('sCounted').textContent=euro(cv);$('sRetail').textContent=euro(rv);$('sMargin').textContent=euro(rv-cv);const orders=products.map(p=>({p,n:Math.max(0,(p.min||0)-stockTotal(p))})).filter(x=>x.n>0);$('orders').innerHTML=orders.length?orders.map(x=>`<div class="order-row clickable" data-edit-product="${esc(x.p.id)}"><span>${esc(x.p.name)}</span><b class="diff-bad">${x.n} Stk.</b></div>`).join(''):'<p style="color:#777">Keine Bestellvorschläge.</p>';$('locationStats').innerHTML=locations.map(l=>{const pcs=products.reduce((a,p)=>a+num((p.stockByLocation||{})[l]),0),v=products.reduce((a,p)=>a+num((p.stockByLocation||{})[l])*p.buy,0);return `<div class="order-row"><span>${esc(l)}</span><b>${pcs} Stk. · ${euro(v)}</b></div>`}).join('')}
-function renderLocationsPage(){
- $('locationPage').innerHTML=locations.map(l=>{
-   const pcs=products.reduce((a,p)=>a+num((p.stockByLocation||{})[l]),0),
-         items=products.filter(p=>num((p.stockByLocation||{})[l])>0).length,
-         value=products.reduce((a,p)=>a+num((p.stockByLocation||{})[l])*p.buy,0);
-   return `<article class="location-card" data-location="${esc(l)}">
-     <span class="kicker gold">LAGERORT</span>
-     <h3>${esc(l)}</h3>
-     <strong>${pcs} Stück</strong>
-     <p style="color:#777">${items} Artikel · ${euro(value)} EK-Wert</p>
-     <span class="open-location">Produkte anzeigen →</span>
-   </article>`
- }).join('');
-
- document.querySelectorAll('.location-card[data-location]').forEach(card=>{
-   card.addEventListener('click',()=>showLocationDetail(card.dataset.location));
- });
-
- if(activeLocationDetail && locations.includes(activeLocationDetail)) showLocationDetail(activeLocationDetail,false);
-}
-function showLocationDetail(loc,scroll=true){
- activeLocationDetail=loc;
- const rows=products.filter(p=>num((p.stockByLocation||{})[loc])>0).sort((a,b)=>a.name.localeCompare(b.name,'de'));
- const pieces=rows.reduce((a,p)=>a+num((p.stockByLocation||{})[loc]),0);
- const value=rows.reduce((a,p)=>a+num((p.stockByLocation||{})[loc])*p.buy,0);
- $('locationDetailTitle').textContent=loc;
- $('locationDetailMeta').textContent=`${rows.length} verschiedene Artikel · ${pieces} Stück · ${euro(value)} EK-Wert`;
- $('locationProducts').innerHTML=rows.length?rows.map(p=>{
-   const locCount=num((p.stockByLocation||{})[loc]), totalAll=total(p);
-   return `<article class="location-product" data-edit-product="${esc(p.id)}">
-      <h4>${esc(p.name)}</h4>
-      <div class="lp-meta">Barcode: ${esc(p.barcode||'–')}</div>
-      <div class="lp-count"><div><span>in ${esc(loc)}</span><strong>${locCount}</strong></div><div style="text-align:right"><span>gesamt gezählt</span><strong style="color:#ddd">${totalAll}</strong></div></div>
-   </article>`
- }).join(''):'<p style="color:#777">In diesem Lagerort wurde noch kein Produkt gezählt.</p>';
- $('locationDetail').classList.remove('hidden');
- attachEditHandlers();
- if(scroll) $('locationDetail').scrollIntoView({behavior:'smooth',block:'start'});
-}
-function renderHistory(){let h=[];try{h=JSON.parse(localStorage.getItem(HIST)||'[]')}catch(e){};$('history').innerHTML=h.length?h.map(x=>`<div class="order-row"><div><strong>${esc(x.title)}</strong><small style="display:block;color:#777">${esc(x.date)}</small></div><b>${x.counted}/${x.total}</b></div>`).join(''):'<p style="color:#777">Noch keine abgeschlossene Inventur.</p>'}
-function selectProduct(){const p=find($('searchInput').value);if(!p){toast('Artikel nicht gefunden');return}current=p;$('countPanel').classList.remove('hidden');$('countName').textContent=p.name;$('countMeta').textContent=`Soll ${p.expected} · bisher Ist ${total(p)} · ${$('locationSelect').value}`;$('qty').value=1}
-function saveCount(){if(!current)return;const q=Math.max(0,num($('qty').value)),loc=$('locationSelect').value;current.counts=current.counts||{};current.counts[loc]=num(current.counts[loc])+q;recent.unshift({name:current.name,qty:q,loc,at:new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})});recent=recent.slice(0,8);$('countPanel').classList.add('hidden');$('searchInput').value='';current=null;save();render();toast('Menge gespeichert')}
-
-function openScanProduct(p,restart=true){
- scanProduct=p;scanRestartAfterSave=restart;
- $('scanProductName').textContent=p.name;
- $('scanProductBarcode').textContent='Barcode: '+(p.barcode||'–');
- $('scanSoll').textContent=p.expected;
- $('scanIst').textContent=total(p);
- const d=diff(p);
- $('scanDiff').textContent=total(p)?((d>0?'+':'')+d):'–';
- $('scanDiff').className=d===0&&total(p)>0?'diff-good':'diff-bad';
- renderLocations();
- $('scanLocation').value=$('locationSelect').value||locations[0]||'Salon';
- $('scanQty').value=1;
- $('scanProductDialog').showModal();
-}
-
-function saveScanProduct(restart){
- if(!scanProduct)return;
- const qty=Math.max(0,num($('scanQty').value)),loc=$('scanLocation').value||'Salon';
- scanProduct.counts=scanProduct.counts||{};
- scanProduct.counts[loc]=num(scanProduct.counts[loc])+qty;
- recent.unshift({name:scanProduct.name,qty,loc,at:new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})});
- recent=recent.slice(0,8);
- $('locationSelect').value=loc;
- $('scanProductDialog').close();
- scanProduct=null;
- save();render();toast('Artikel gespeichert');
- if(navigator.vibrate)navigator.vibrate(80);
- try{const A=window.AudioContext||window.webkitAudioContext,c=new A(),o=c.createOscillator(),g=c.createGain();o.connect(g);g.connect(c.destination);o.frequency.value=880;g.gain.value=.025;o.start();o.stop(c.currentTime+.07)}catch(e){}
- if(restart)setTimeout(()=>openFullScanner(),250);
-}
-
-async function openFullScanner(mode='inventory'){
- scannerMode=mode;
- scanConfirming=false;
- resetScanCandidate();
- if(typeof Quagga==='undefined'){
-   toast('Barcode-Scanner konnte nicht geladen werden');
-   return;
- }
-
- try{
-   if(quaggaActive && typeof Quagga!=='undefined'){
-     Quagga.offDetected(handleQuaggaDetected);
-     Quagga.stop();
-     quaggaActive=false;
-     const oldTarget=$('quaggaReader');
-     if(oldTarget)oldTarget.innerHTML='';
-   }
- }catch(e){}
- $('fullScannerModal').classList.remove('hidden');
-
- const isiOS=/iPad|iPhone|iPod/.test(navigator.userAgent) ||
-   (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);
-
- const readers=[
-   'ean_reader',
-   'ean_8_reader',
-   'upc_reader',
-   'upc_e_reader',
-   'code_128_reader',
-   'code_39_reader',
-   'i2of5_reader'
- ];
-
- try{
-   await new Promise((resolve,reject)=>{
-     Quagga.init({
-       inputStream:{
-         type:'LiveStream',
-         target:$('quaggaReader'),
-         constraints:{
-           facingMode:'environment',
-           width:{ideal:isiOS?1920:1280},
-           height:{ideal:isiOS?1080:720},
-           aspectRatio:{ideal:1.7777778}
-         },
-         area:{top:'20%',right:'5%',left:'5%',bottom:'20%'}
-       },
-       locator:{
-         patchSize:isiOS?'medium':'medium',
-         halfSample:!isiOS
-       },
-       numOfWorkers:isiOS?0:Math.min(4,navigator.hardwareConcurrency||2),
-       frequency:isiOS?10:14,
-       decoder:{
-         readers,
-         multiple:false
-       },
-       locate:true
-     },err=>err?reject(err):resolve());
-   });
-
-   Quagga.offDetected(handleQuaggaDetected);
-   Quagga.onDetected(handleQuaggaDetected);
-   Quagga.start();
-   quaggaActive=true;
- }catch(e){
-   console.error('Quagga scanner error',e);
-   quaggaActive=false;
-   $('fullScannerModal').classList.add('hidden');
-   toast('Kamera konnte nicht geöffnet werden – bitte erneut versuchen');
- }
-}
-
-
-
-function askCreateUnknownBarcode(code){
- pendingUnknownBarcode=normalizeBarcode(code);
- $('unknownBarcodeValue').textContent=pendingUnknownBarcode;
- if(!$('unknownBarcodeDialog').open)$('unknownBarcodeDialog').showModal();
-}
-function continueAfterUnknown(){
- const mode=scannerMode;
- $('unknownBarcodeDialog').close();
- pendingUnknownBarcode='';
- setTimeout(()=>openFullScanner(mode),220);
-}
-function createFromUnknownBarcode(){
- const code=pendingUnknownBarcode;
- const fromCabinet=scannerMode==='cabinet';
- const roleMode=window._roleScanMode||'';
- window._roleScanMode='';scannerMode='inventory';
- $('unknownBarcodeDialog').close();
- pendingUnknownBarcode='';
- openNewArticle();
- $('epBarcode').value=code;
- if(fromCabinet){$('epUnit').value='gram';$('epPackageGrams').value=60;$('roleCabinet').checked=true;}
- if(roleMode==='employee')$('roleEmployee').checked=true;
- if(roleMode==='asset')$('roleAsset').checked=true;
- $('epName').focus();
- toast('Barcode übernommen – Artikeldaten ergänzen');
-}
-function normalizeBarcode(v){
- return String(v||'').trim().replace(/\s+/g,'');
-}
-function findBarcodeFlexible(code){
- const raw=normalizeBarcode(code);
- let p=find(raw);
- if(p)return p;
- // Some decoders/browser combinations may add/remove a UPC/EAN leading zero.
- const numeric=raw.replace(/\D/g,'');
- const candidates=[raw,numeric];
- if(numeric.length===12)candidates.push('0'+numeric);
- if(numeric.length===13 && numeric.startsWith('0'))candidates.push(numeric.slice(1));
- return products.find(x=>{
-   const b=normalizeBarcode(x.barcode).replace(/\D/g,'');
-   return candidates.includes(normalizeBarcode(x.barcode)) || candidates.includes(b);
- });
-}
-async function confirmBarcodeFromFrame(firstCode){
- if(scanConfirming)return;
- scanConfirming=true;
-
- const video=document.querySelector('#quaggaReader video');
- let imageData=null;
-
- try{
-   if(video && video.videoWidth && video.videoHeight){
-     const canvas=document.createElement('canvas');
-     canvas.width=video.videoWidth;
-     canvas.height=video.videoHeight;
-     const ctx=canvas.getContext('2d',{willReadFrequently:true});
-     ctx.drawImage(video,0,0,canvas.width,canvas.height);
-     imageData=canvas.toDataURL('image/jpeg',0.96);
-   }
-
-   // Freeze live scanning while the captured frame is checked.
-   try{
-     if(quaggaActive){
-       Quagga.offDetected(handleQuaggaDetected);
-       Quagga.stop();
-       quaggaActive=false;
-     }
-   }catch(e){}
-
-   let confirmed=normalizeBarcode(firstCode);
-
-   // Second independent decode of the captured camera frame.
-   if(imageData){
-     try{
-       const result=await new Promise((resolve,reject)=>{
-         Quagga.decodeSingle({
-           src:imageData,
-           numOfWorkers:0,
-           locate:true,
-           locator:{patchSize:'medium',halfSample:false},
-           decoder:{readers:[
-             'ean_reader','ean_8_reader','upc_reader','upc_e_reader',
-             'code_128_reader','code_39_reader','i2of5_reader'
-           ]}
-         },r=>r?.codeResult?.code?resolve(r):reject(new Error('Kein zweiter Treffer')));
-       });
-       const snapshotCode=normalizeBarcode(result.codeResult.code);
-       // Use snapshot only if it agrees with the stable live code or maps to same known product.
-       const liveProduct=findBarcodeFlexible(firstCode);
-       const snapshotProduct=findBarcodeFlexible(snapshotCode);
-       if(snapshotCode===normalizeBarcode(firstCode) || (liveProduct && snapshotProduct && String(liveProduct.id)===String(snapshotProduct.id))){
-         confirmed=snapshotCode;
-       }
-     }catch(e){
-       // Stable live result remains authoritative if snapshot cannot confirm.
-     }
-   }
-
-   const p=findBarcodeFlexible(firstCode) || findBarcodeFlexible(confirmed);
-   await closeFullScanner(false);
-
-   if(p){
-     if(navigator.vibrate)navigator.vibrate([70,40,70]);
-     if(window._roleScanMode==='employee'){
-       window._roleScanMode='';
-       openEmployeeSale(p);
-     }else if(window._roleScanMode==='asset'){
-       window._roleScanMode='';
-       openAssetIssue(p);
-     }else if(scannerMode==='cabinet'){
-       scannerMode='inventory';
-       openCabinetUsageFlow(p);
-     }else{
-       openScanProduct(p,true);
-     }
-   }else{
-     askCreateUnknownBarcode(firstCode);
-   }
- }catch(e){
-   console.error('scan confirmation error',e);
-   try{await closeFullScanner(false)}catch(_){}
-   toast('Barcode konnte nicht bestätigt werden');
-   setTimeout(()=>openFullScanner(),900);
- }finally{
-   scanConfirming=false;
- }
-}
-
-function validEanChecksum(code){
- const digits=String(code||'').replace(/\D/g,'');
- if(![8,12,13].includes(digits.length))return true;
-
- // UPC-A (12 digits) and EAN-13/EAN-8 all use modulo-10 checksums.
- const nums=digits.split('').map(Number);
- const check=nums.pop();
- let sum=0;
-
- if(digits.length===13){
-   // EAN-13: from left, odd positions x1, even positions x3.
-   nums.forEach((n,i)=>sum+=n*((i%2===0)?1:3));
- }else if(digits.length===8){
-   // EAN-8: odd positions x3, even positions x1.
-   nums.forEach((n,i)=>sum+=n*((i%2===0)?3:1));
- }else if(digits.length===12){
-   // UPC-A: odd positions x3, even positions x1.
-   nums.forEach((n,i)=>sum+=n*((i%2===0)?3:1));
- }
- const calculated=(10-(sum%10))%10;
- return calculated===check;
-}
-
-function barcodeLooksValid(code,format){
- const c=normalizeBarcode(code);
- if(!c)return false;
-
- if(/ean|upc/i.test(format||'')){
-   if(!/^\d{7,14}$/.test(c))return false;
-   if(!validEanChecksum(c))return false;
- }
- return true;
-}
-
-function resetScanCandidate(){
- scanCandidateCode='';
- scanCandidateCount=0;
- scanCandidateLastAt=0;
- scanCandidateFormat='';
-}
-
-function registerStableScan(code,format){
- const now=Date.now();
- const c=normalizeBarcode(code);
-
- // Candidate expires quickly; a new pass over the barcode starts fresh.
- if(now-scanCandidateLastAt>1200 || c!==scanCandidateCode){
-   scanCandidateCode=c;
-   scanCandidateCount=1;
-   scanCandidateFormat=format||'';
-   scanCandidateLastAt=now;
-   return false;
- }
-
- scanCandidateCount++;
- scanCandidateLastAt=now;
-
- // Existing inventory codes can be accepted sooner.
- const known=!!findBarcodeFlexible(c);
- const required=known ? 2 : 4;
-
- return scanCandidateCount>=required;
-}
-function handleQuaggaDetected(result){
- const code=normalizeBarcode(result?.codeResult?.code);
- const format=result?.codeResult?.format||'';
-
- if(!code || scanConfirming)return;
- if(!barcodeLooksValid(code,format))return;
-
- // Do not react to every transient decoder result.
- if(!registerStableScan(code,format))return;
-
- // Prevent duplicate handling once consensus is reached.
- if(code===lastScan)return;
- lastScan=code;
- setTimeout(()=>lastScan='',2200);
-
- const frame=document.querySelector('.scan-frame');
- frame?.classList.add('detected');
- setTimeout(()=>frame?.classList.remove('detected'),500);
-
- resetScanCandidate();
-
- // Only after consensus do we freeze the frame and perform the second decode.
- confirmBarcodeFromFrame(code);
-}
-
-async function closeFullScanner(showIdle=true){
- try{
-   if(quaggaActive && typeof Quagga!=='undefined'){
-     Quagga.offDetected(handleQuaggaDetected);
-     Quagga.stop();
-   }
- }catch(e){}
- quaggaActive=false;
- resetScanCandidate();
- const target=$('quaggaReader');
- if(target)target.innerHTML='';
- $('fullScannerModal').classList.add('hidden');
-}
-
-
-async function switchFullCamera(){
- const isiOS=/iPad|iPhone|iPod/.test(navigator.userAgent) ||
-   (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);
- if(isiOS){
-   toast('Auf iPhone/iPad verwendet der Scanner automatisch die Rückkamera');
-   return;
- }
- await closeFullScanner(false);
- setTimeout(()=>openFullScanner(),180);
-}
-async function toggleTorch(){
- const isiOS=/iPad|iPhone|iPod/.test(navigator.userAgent) ||
-   (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);
- if(isiOS){
-   toast('Taschenlampe ist im iPhone-Webscanner nicht zuverlässig verfügbar');
-   return;
- }
- try{
-   const track=Quagga?.CameraAccess?.getActiveTrack?.();
-   if(!track){toast('Keine aktive Kamera');return}
-   const caps=track.getCapabilities?.();
-   if(!caps?.torch){toast('Taschenlampe nicht unterstützt');return}
-   const current=track.getSettings?.().torch||false;
-   await track.applyConstraints({advanced:[{torch:!current}]});
- }catch(e){toast('Taschenlampe konnte nicht geschaltet werden')}
-}
-async function startScanner(){if(typeof Html5Qrcode==='undefined'){toast('Scanner konnte nicht geladen werden');return}$('scannerIdle').classList.add('hidden');$('scannerLive').classList.remove('hidden');try{scanner=new Html5Qrcode('reader');await scanner.start({facingMode:'environment'},{fps:12,qrbox:{width:280,height:160}},code=>{if(code===lastScan)return;lastScan=code;setTimeout(()=>lastScan='',1200);$('searchInput').value=code;selectProduct()})}catch(e){toast('Kamera konnte nicht gestartet werden')}}
-async function stopScanner(){try{if(scanner){await scanner.stop();await scanner.clear();scanner=null}}catch(e){}$('scannerIdle').classList.remove('hidden');$('scannerLive').classList.add('hidden')}
 async function importFile(f){
  if(!f)return;
  try{
-   const ext=f.name.split('.').pop().toLowerCase();
-   let rows=[];
-   if(ext==='csv'){
-     const raw=await f.text();
-     if(typeof XLSX==='undefined')throw new Error('XLSX nicht geladen');
-     const wb=XLSX.read(raw,{type:'string',raw:true});
-     const ws=wb.Sheets[wb.SheetNames[0]];
-     const matrix=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:false});
-     const headerIndex=matrix.findIndex(row=>{
-       const lower=row.map(x=>String(x).trim().toLowerCase());
-       return lower.includes('name') && lower.includes('einkaufspreis') && lower.includes('bestand');
-     });
-     if(headerIndex<0)throw new Error('Keine Produkt-Kopfzeile gefunden');
-     const headers=matrix[headerIndex].map(x=>String(x).trim());
-     rows=matrix.slice(headerIndex+1)
-       .filter(r=>r.some(v=>String(v).trim()!==''))
-       .map(r=>Object.fromEntries(headers.map((h,i)=>[h,r[i]??''])));
-   }else{
-     const buf=await f.arrayBuffer();
-     const wb=XLSX.read(buf,{type:'array'});
-     const ws=wb.Sheets[wb.SheetNames[0]];
-     rows=XLSX.utils.sheet_to_json(ws,{defval:''});
-   }
-   mapRows(rows);
- }catch(e){
-   console.error(e);
-   toast('Datei konnte nicht gelesen werden');
- }
+   const raw=await f.text(),wb=XLSX.read(raw,{type:'string',raw:true}),ws=wb.Sheets[wb.SheetNames[0]],matrix=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:false});
+   const hi=matrix.findIndex(r=>{const l=r.map(x=>String(x).trim().toLowerCase());return l.includes('name')&&l.includes('einkaufspreis')&&l.includes('bestand')});
+   if(hi<0)throw new Error('Kopfzeile nicht gefunden');
+   const headers=matrix[hi].map(x=>String(x).trim()),rows=matrix.slice(hi+1).filter(r=>r.some(v=>tx(v))).map(r=>Object.fromEntries(headers.map((h,i)=>[h,r[i]??''])));
+   const firstLoc=state.locations[0]||'Salon';
+   state.products=rows.map(r=>{const p={id:uid(),name:tx(r.Name)||'Unbenannt',brand:tx(r.Produktmarke),group:tx(r.Produktgruppe),barcode:tx(r.Barcode||r.EAN),buy:num(String(r.Einkaufspreis).replace(/[^\d,.-]/g,'')),sell:num(String(r.Preis).replace(/[^\d,.-]/g,'')),min:0,packageGrams:0,roles:/farbe/i.test(tx(r.Produktgruppe))?['retail','cabinet']:['retail'],employeePricing:'ek_vat',vatRate:19,employeePrice:0,assetCount:0,stockByLocation:{},cabinetOpen:null};p.stockByLocation[firstLoc]=Math.max(0,num(String(r.Bestand).replace(/[^\d,.-]/g,'')));ensureProduct(p);return p});
+   state.products.forEach(p=>addHistory('stock_import',p,stockTotal(p),'Stk.',{location:firstLoc,reason:'CSV-Import'}));
+   save();render();toast(state.products.length+' Artikel importiert')
+ }catch(e){console.error(e);toast('CSV konnte nicht gelesen werden')}
 }
-function exportCsv(){if(!products.length){toast('Keine Daten');return}const rows=[['Artikel','Marke','Produktgruppe','Barcode','Soll Inventur','Ist Inventur','Lagerbestand','EK','VK','Verwendung','Salon-Inventar','Lagerorte']];products.forEach(p=>{ensureProductModel(p);rows.push([p.name,p.brand,p.group,p.barcode,p.expected,total(p),stockTotal(p),p.buy,p.sell,p.roles.join('|'),p.assetCount,Object.entries(p.stockByLocation||{}).map(([k,v])=>`${k}:${v}`).join('|')])});const csv=rows.map(r=>r.map(v=>`"${String(v??'').replace(/"/g,'""')}"`).join(';')).join('\n'),blob=new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='inventur-ergebnis.csv';a.click()}
-function finish(){if(!products.length){toast('Keine Inventur');return}let h=[];try{h=JSON.parse(localStorage.getItem(HIST)||'[]')}catch(e){};const d=new Date();h.unshift({title:'Inventur '+d.toLocaleDateString('de-DE'),date:d.toLocaleString('de-DE'),counted:products.filter(p=>total(p)>0).length,total:products.length});localStorage.setItem(HIST,JSON.stringify(h));renderHistory();exportCsv();toast('Inventur abgeschlossen')}
+
+function createInventory(){
+ const name=tx($('newInvName').value)||'Inventur '+new Date().toLocaleDateString('de-DE');
+ const items=state.products.map(p=>({productId:p.id,name:p.name,barcode:p.barcode,brand:p.brand,group:p.group,expectedByLocation:structuredClone(p.stockByLocation),counts:{}}));
+ const inv={id:uid(),name,createdAt:now(),status:'open',items,locations:[...state.locations]};
+ state.inventories.unshift(inv);state.activeInventoryId=inv.id;$('newInventoryDialog').close();$('newInvName').value='';save();render();toast('Inventur gestartet')
+}
+function activeInventory(){return state.inventories.find(i=>i.id===state.activeInventoryId)}
+function invExpected(item){return Object.values(item.expectedByLocation||{}).reduce((a,b)=>a+num(b),0)}
+function invCount(item){return Object.values(item.counts||{}).reduce((a,b)=>a+num(b),0)}
+function renderInventorySessions(){
+ $('inventorySessionList').innerHTML=state.inventories.length?state.inventories.map(i=>{const counted=i.items.filter(x=>invCount(x)>0).length;return `<div class="inventory-session"><div><strong>${esc(i.name)}</strong><small>${new Date(i.createdAt).toLocaleString('de-DE')} · ${counted}/${i.items.length} gezählt</small></div><div class="session-actions"><span class="status ${i.status==='done'?'done':''}">${i.status==='done'?'abgeschlossen':'offen'}</span><button class="btn dark-btn" data-open-inv="${i.id}">Öffnen</button></div></div>`}).join(''):'<p class="muted">Noch keine Inventur.</p>';
+ document.querySelectorAll('[data-open-inv]').forEach(b=>b.addEventListener('click',()=>{state.activeInventoryId=b.dataset.openInv;save();renderInventorySessions()}));
+ const inv=activeInventory();$('activeInventoryArea').classList.toggle('hidden',!inv);if(!inv)return;
+ $('invTitle').textContent=inv.name;$('invMeta').textContent=`Snapshot vom ${new Date(inv.createdAt).toLocaleString('de-DE')} · Status: ${inv.status==='done'?'abgeschlossen':'offen'}`;$('inventoryLocation').innerHTML=inv.locations.map(l=>`<option>${esc(l)}</option>`).join('');
+ const counted=inv.items.filter(i=>invCount(i)>0).length,diffs=inv.items.filter(i=>invCount(i)>0&&invCount(i)!==invExpected(i)).length,pct=inv.items.length?Math.round(counted/inv.items.length*100):0;
+ $('invTotal').textContent=inv.items.length;$('invCounted').textContent=counted;$('invDiffs').textContent=diffs;$('invPercent').textContent=pct+' %';
+ $('inventoryCards').innerHTML=inv.items.map(i=>{const c=invCount(i),e=invExpected(i),d=c-e;return `<article class="product-card" data-inv-item="${i.productId}"><h4>${esc(i.name)}</h4><div class="meta">${esc(i.barcode||'kein Barcode')}</div><div class="numbers"><div><small>Soll</small><strong>${e}</strong></div><div><small>Ist</small><strong>${c}</strong></div><div><small>Diff.</small><strong class="${d===0&&c>0?'positive':d!==0&&c>0?'negative':''}">${c?((d>0?'+':'')+d):'–'}</strong></div></div></article>`}).join('');
+ document.querySelectorAll('[data-inv-item]').forEach(el=>el.addEventListener('click',()=>openCountDialog(el.dataset.invItem)))
+}
+function openCountDialog(productId){
+ const inv=activeInventory();if(!inv||inv.status==='done'){toast('Inventur ist abgeschlossen');return}
+ const item=inv.items.find(x=>x.productId===productId);if(!item)return;activeProductId=productId;$('countName').textContent=item.name;$('countMeta').textContent=`Soll gesamt ${invExpected(item)} · bisher Ist ${invCount(item)}`;$('countLocation').innerHTML=inv.locations.map(l=>`<option>${esc(l)}</option>`).join('');$('countLocation').value=$('inventoryLocation').value;$('countQty').value=1;$('countDialog').showModal()
+}
+function saveCount(){const inv=activeInventory(),item=inv?.items.find(x=>x.productId===activeProductId);if(!item)return;const loc=$('countLocation').value;item.counts[loc]=num(item.counts[loc])+Math.max(0,num($('countQty').value));$('countDialog').close();activeProductId=null;save();renderInventorySessions();toast('Zählung gespeichert')}
+function finishInventory(){const inv=activeInventory();if(!inv)return;if(!confirm('Inventur wirklich abschließen? Der Lagerbestand wird dadurch NICHT automatisch verändert.'))return;inv.status='done';inv.finishedAt=now();save();render();toast('Inventur abgeschlossen')}
+
+function openEmployee(p){ensureProduct(p);if(!p.roles.includes('employee')){toast('Artikel ist nicht für MA Verkauf freigegeben');return}if(stockTotal(p)<=0){toast('Kein Lagerbestand');return}dialogProduct=p;$('esName').textContent=p.name;fillLocations('esLocation',p);$('esQty').value=1;$('esPrice').value=employeePrice(p).toFixed(2);$('esEmployee').value='';$('esEk').textContent=euro(p.buy);updateEmployeeTotal();$('employeeDialog').showModal()}
+function updateEmployeeTotal(){if(!dialogProduct)return;const q=Math.max(1,num($('esQty').value)),pr=Math.max(0,num($('esPrice').value));$('esUnit').textContent=euro(pr);$('esTotal').textContent=euro(q*pr)}
+function saveEmployee(){const p=dialogProduct,loc=$('esLocation').value,q=Math.max(1,num($('esQty').value)),avail=num(p.stockByLocation[loc]);if(q>avail){toast('Nicht genug Bestand');return}p.stockByLocation[loc]=avail-q;addHistory('employee_sale',p,-q,'Stk.',{location:loc,employee:tx($('esEmployee').value),unitPrice:num($('esPrice').value),note:'Mitarbeiterverkauf'});$('employeeDialog').close();dialogProduct=null;save();render();toast('MA Verkauf gebucht')}
+function openAssetIssue(p){ensureProduct(p);if(!p.roles.includes('asset')){toast('Artikel ist nicht als Inventar freigegeben');return}if(stockTotal(p)<=0){toast('Kein Lagerbestand');return}dialogProduct=p;$('aiName').textContent=p.name;fillLocations('aiLocation',p);$('aiQty').value=1;$('aiArea').value='';$('aiNote').value='';$('assetIssueDialog').showModal()}
+function saveAssetIssue(){const p=dialogProduct,loc=$('aiLocation').value,q=Math.max(1,num($('aiQty').value)),avail=num(p.stockByLocation[loc]);if(q>avail){toast('Nicht genug Bestand');return}p.stockByLocation[loc]=avail-q;p.assetCount+=q;addHistory('asset_issue',p,-q,'Stk.',{location:loc,area:tx($('aiArea').value),note:tx($('aiNote').value)});$('assetIssueDialog').close();dialogProduct=null;save();render();toast('Ins Inventar ausgegeben')}
+function openAssetRemove(p){dialogProduct=p;$('arName').textContent=p.name;$('arQty').value=1;$('arReason').value='defekt';fillLocations('arLocation',p,false);$('arNote').value='';$('assetRemoveDialog').showModal()}
+function saveAssetRemove(){const p=dialogProduct,q=Math.max(1,num($('arQty').value));if(q>p.assetCount){toast('Nicht so viele Stück im Inventar');return}const reason=$('arReason').value,loc=$('arLocation').value;p.assetCount-=q;if(reason==='return'){p.stockByLocation[loc]=num(p.stockByLocation[loc])+q;addHistory('asset_return',p,q,'Stk.',{location:loc,reason:'Zurück ins Lager',note:tx($('arNote').value)})}else addHistory('asset_remove',p,-q,'Stk.',{reason,note:tx($('arNote').value)});$('assetRemoveDialog').close();dialogProduct=null;save();render();toast('Inventar aktualisiert')}
+
+function openCabinet(p){
+ ensureProduct(p);if(!p.roles.includes('cabinet')){toast('Artikel ist nicht als Kabinettware freigegeben');return}
+ dialogProduct=p;$('cuName').textContent=p.name;$('cuMeta').textContent=p.barcode||'kein Barcode';$('cabinetOpenBlock').classList.toggle('hidden',!!p.cabinetOpen);$('cabinetUseBlock').classList.toggle('hidden',!p.cabinetOpen);
+ if(!p.cabinetOpen){$('cuPackage').value=p.packageGrams||60;fillLocations('cuOpenLocation',p)}
+ else{fillLocations('cuLocation',p,false);$('cuLocation').value=p.cabinetOpen.location;$('cuPackageShow').textContent=Math.round(p.packageGrams)+' g';$('cuRemaining').textContent=Math.round(p.cabinetOpen.remainingGrams)+' g';$('cuUsed').textContent=Math.round(p.cabinetOpen.usedGrams)+' g';$('cuGrams').value=Math.min(10,Math.max(1,Math.round(p.cabinetOpen.remainingGrams)));$('cuType').value='use';$('cuNote').value=''}
+ $('cabinetDialog').showModal()
+}
+function openCabinetPackage(){const p=dialogProduct,loc=$('cuOpenLocation').value,pkg=Math.max(1,num($('cuPackage').value)),avail=num(p.stockByLocation[loc]);if(avail<1){toast('Keine volle VE im Lager');return}p.stockByLocation[loc]=avail-1;p.packageGrams=pkg;p.cabinetOpen={location:loc,remainingGrams:pkg,usedGrams:0,openedAt:now()};addHistory('cabinet_open',p,-1,'VE',{location:loc,note:'Neues Gebinde geöffnet'});$('cabinetDialog').close();save();render();openCabinet(p)}
+function saveCabinet(markEmpty=false){const p=dialogProduct;if(!p?.cabinetOpen)return;const loc=$('cuLocation').value,before=num(p.cabinetOpen.remainingGrams);if(markEmpty){addHistory('cabinet_empty',p,-before,'g',{location:loc,reason:'Manuell als leer bestätigt',note:tx($('cuNote').value)});p.cabinetOpen=null}else{const g=Math.min(before,Math.max(0,num($('cuGrams').value))),type=$('cuType').value;p.cabinetOpen.remainingGrams=before-g;p.cabinetOpen.usedGrams=num(p.cabinetOpen.usedGrams)+g;p.cabinetOpen.location=loc;addHistory(type==='waste'?'cabinet_waste':'cabinet_use',p,-g,'g',{location:loc,note:tx($('cuNote').value)});if(p.cabinetOpen.remainingGrams<=0)p.cabinetOpen=null}$('cabinetDialog').close();dialogProduct=null;save();render();toast('Kabinettware aktualisiert')}
+
+function validChecksum(code){const d=String(code).replace(/\D/g,'');if(![8,12,13].includes(d.length))return true;const a=d.split('').map(Number),check=a.pop();let s=0;if(d.length===13)a.forEach((n,i)=>s+=n*(i%2===0?1:3));else a.forEach((n,i)=>s+=n*(i%2===0?3:1));return (10-s%10)%10===check}
+function resetScan(){scanCandidate='';scanCount=0;scanLastAt=0}
+function stableScan(code,format){const t=Date.now();if(/ean|upc/i.test(format||'')&&!validChecksum(code))return false;if(t-scanLastAt>1200||code!==scanCandidate){scanCandidate=code;scanCount=1;scanLastAt=t;return false}scanCount++;scanLastAt=t;const known=!!state.products.find(p=>p.barcode===code);return scanCount>=(known?2:4)}
+async function startScanner(mode){
+ scannerMode=mode;resetScan();scanConfirming=false;$('scannerTitle').textContent={stock:'Artikel suchen',inventory:'Inventur scannen',employee:'MA Verkauf scannen',asset:'Inventar scannen',cabinet:'Kabinettware scannen'}[mode]||'Barcode scannen';$('scannerModal').classList.remove('hidden');
+ try{
+   await new Promise((res,rej)=>Quagga.init({inputStream:{type:'LiveStream',target:$('quaggaReader'),constraints:{facingMode:'environment',width:{ideal:1920},height:{ideal:1080}},area:{top:'20%',right:'5%',left:'5%',bottom:'20%'}},locator:{patchSize:'medium',halfSample:false},numOfWorkers:0,frequency:10,decoder:{readers:['ean_reader','ean_8_reader','upc_reader','upc_e_reader','code_128_reader','code_39_reader','i2of5_reader']},locate:true},e=>e?rej(e):res()));
+   Quagga.offDetected(onDetected);Quagga.onDetected(onDetected);Quagga.start();scannerActive=true
+ }catch(e){console.error(e);$('scannerModal').classList.add('hidden');toast('Kamera konnte nicht gestartet werden')}
+}
+function onDetected(r){const code=tx(r?.codeResult?.code),format=r?.codeResult?.format||'';if(!code||scanConfirming||!stableScan(code,format))return;scanConfirming=true;document.querySelector('.scan-frame')?.classList.add('detected');setTimeout(()=>document.querySelector('.scan-frame')?.classList.remove('detected'),400);closeScanner(false).then(()=>routeScan(code))}
+async function closeScanner(){try{if(scannerActive){Quagga.offDetected(onDetected);Quagga.stop()}}catch(e){}scannerActive=false;$('quaggaReader').innerHTML='';$('scannerModal').classList.add('hidden');resetScan();scanConfirming=false}
+function routeScan(code){
+ const p=state.products.find(x=>x.barcode===code);
+ if(!p){pendingBarcode=code;$('unknownCode').textContent=code;$('unknownDialog').showModal();return}
+ if(scannerMode==='inventory'){const inv=activeInventory(),item=inv?.items.find(x=>x.productId===p.id);if(!item){toast('Artikel ist nicht in diesem Inventur-Snapshot');return}openCountDialog(p.id)}
+ else if(scannerMode==='employee')openEmployee(p);
+ else if(scannerMode==='asset')openAssetIssue(p);
+ else if(scannerMode==='cabinet')openCabinet(p);
+ else openProductDialog(p)
+}
+function continueUnknown(){const m=scannerMode;$('unknownDialog').close();pendingBarcode='';setTimeout(()=>startScanner(m),200)}
+function openAssign(){$('unknownDialog').close();$('assignSearch').value='';renderAssign();$('assignDialog').showModal()}
+function renderAssign(){const q=tx($('assignSearch').value).toLowerCase(),list=state.products.filter(p=>!q||p.name.toLowerCase().includes(q)||p.brand.toLowerCase().includes(q)||p.group.toLowerCase().includes(q)).slice(0,50);$('assignResults').innerHTML=list.map(p=>`<div class="assign-result" data-assign="${p.id}"><strong>${esc(p.name)}</strong><small>${esc(p.brand)} · ${esc(p.group)} · ${p.barcode?'Barcode '+esc(p.barcode):'noch kein Barcode'}</small></div>`).join('');document.querySelectorAll('[data-assign]').forEach(el=>el.addEventListener('click',()=>{const p=state.products.find(x=>x.id===el.dataset.assign);p.barcode=pendingBarcode;pendingBarcode='';$('assignDialog').close();save();render();toast('Barcode zugeordnet')}))}
+function createUnknown(){$('unknownDialog').close();const b=pendingBarcode;pendingBarcode='';openProductDialog(null,b)}
+
+function downloadCsv(rows,name){const csv=rows.map(r=>r.map(v=>`"${String(v??'').replace(/"/g,'""')}"`).join(';')).join('\n'),a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'}));a.download=name;a.click()}
+function exportStock(){const rows=[['Artikel','Marke','Gruppe','Barcode','Lagerbestand','EK','VK','Inventar','Rollen','Lagerorte']];state.products.forEach(p=>rows.push([p.name,p.brand,p.group,p.barcode,stockTotal(p),p.buy,p.sell,p.assetCount,p.roles.join('|'),Object.entries(p.stockByLocation).map(([k,v])=>`${k}:${v}`).join('|')]));downloadCsv(rows,'lagerbestand.csv')}
+function exportHistory(){const rows=[['Datum','Typ','Artikel','Delta','Einheit','Lagerort','Grund','Notiz','Mitarbeiter','Bereich']];state.history.forEach(h=>rows.push([h.date,historyLabel(h.type),h.productName,h.delta,h.unit,h.location,h.reason,h.note,h.employee,h.area]));downloadCsv(rows,'historie.csv')}
 
 document.querySelectorAll('.nav-item').forEach(b=>b.addEventListener('click',()=>go(b.dataset.page)));
 document.querySelectorAll('[data-go]').forEach(b=>b.addEventListener('click',()=>go(b.dataset.go)));
-$('themeBtn').addEventListener('click',()=>{theme=theme==='dark'?'light':'dark';if(theme==='light')document.documentElement.dataset.theme='light';else delete document.documentElement.dataset.theme});
-$('demoBtn')?.addEventListener('click',demo);$('dashImport').addEventListener('change',e=>importFile(e.target.files[0]));$('inventoryImport').addEventListener('change',e=>importFile(e.target.files[0]));
-$('addLocation').addEventListener('click',()=>{const l=tx($('newLocation').value);if(l&&!locations.includes(l)){locations.push(l);products.forEach(p=>{ensureProductModel(p);p.stockByLocation[l]=0;p.counts=p.counts||{};p.counts[l]=0});$('newLocation').value='';save();render()}});
-$('findProduct').addEventListener('click',()=>{const p=find($('searchInput').value);if(!p){toast('Artikel nicht gefunden');return}openScanProduct(p,false)});
-$('searchInput').addEventListener('keydown',e=>{if(e.key==='Enter'){const p=find($('searchInput').value);if(!p){toast('Artikel nicht gefunden');return}openScanProduct(p,false)}});$('plus').addEventListener('click',()=>$('qty').value=num($('qty').value)+1);$('minus').addEventListener('click',()=>$('qty').value=Math.max(0,num($('qty').value)-1));$('saveCount').addEventListener('click',saveCount);
-$('startScanner').addEventListener('click',()=>openFullScanner('inventory'));$('stopScanner').addEventListener('click',stopScanner);$('articleSearch').addEventListener('input',()=>{renderArticles();renderSuggestions()});
+document.querySelectorAll('.operation-mode').forEach(b=>b.addEventListener('click',()=>setOpMode(b.dataset.opmode)));
+$('themeBtn').addEventListener('click',()=>{state.theme=state.theme==='dark'?'light':'dark';document.documentElement.dataset.theme=state.theme;save()});
+$('stockSearch').addEventListener('input',renderStock);$('stockImport').addEventListener('change',e=>importFile(e.target.files[0]));$('newArticleBtn').addEventListener('click',()=>openProductDialog());$('exportStock').addEventListener('click',exportStock);$('stockScanBtn').addEventListener('click',()=>startScanner('stock'));
+$('pdClose').addEventListener('click',()=>$('productDialog').close());$('pdCancel').addEventListener('click',()=>$('productDialog').close());$('pdSave').addEventListener('click',saveProduct);$('pdDelete').addEventListener('click',deleteProduct);
+$('newInventoryBtn').addEventListener('click',()=>{$('newInvName').value='';$('newInventoryDialog').showModal()});$('newInvClose').addEventListener('click',()=>$('newInventoryDialog').close());$('createInventoryBtn').addEventListener('click',createInventory);$('inventoryScanBtn').addEventListener('click',()=>startScanner('inventory'));$('inventoryFindBtn').addEventListener('click',()=>{const p=findProduct($('inventorySearch').value);if(p)openCountDialog(p.id);else toast('Artikel nicht gefunden')});$('inventoryFinishBtn').addEventListener('click',finishInventory);$('countClose').addEventListener('click',()=>$('countDialog').close());$('countMinus').addEventListener('click',()=>$('countQty').value=Math.max(0,num($('countQty').value)-1));$('countPlus').addEventListener('click',()=>$('countQty').value=num($('countQty').value)+1);$('countSave').addEventListener('click',saveCount);
+$('employeeFindBtn').addEventListener('click',()=>{const p=findProduct($('employeeSearch').value);if(p)openEmployee(p);else toast('Artikel nicht gefunden')});$('employeeScanBtn').addEventListener('click',()=>startScanner('employee'));$('esClose').addEventListener('click',()=>$('employeeDialog').close());$('esQty').addEventListener('input',updateEmployeeTotal);$('esPrice').addEventListener('input',updateEmployeeTotal);$('esSave').addEventListener('click',saveEmployee);
+$('assetFindBtn').addEventListener('click',()=>{const p=findProduct($('assetSearch').value);if(p)openAssetIssue(p);else toast('Artikel nicht gefunden')});$('assetScanBtn').addEventListener('click',()=>startScanner('asset'));$('aiClose').addEventListener('click',()=>$('assetIssueDialog').close());$('aiSave').addEventListener('click',saveAssetIssue);$('arClose').addEventListener('click',()=>$('assetRemoveDialog').close());$('arSave').addEventListener('click',saveAssetRemove);
+$('cabinetFindBtn').addEventListener('click',()=>{const p=findProduct($('cabinetSearch').value);if(p)openCabinet(p);else toast('Artikel nicht gefunden')});$('cabinetScanBtn').addEventListener('click',()=>startScanner('cabinet'));$('cuClose').addEventListener('click',()=>$('cabinetDialog').close());$('cuOpenPackage').addEventListener('click',openCabinetPackage);$('cuMinus').addEventListener('click',()=>$('cuGrams').value=Math.max(0,num($('cuGrams').value)-1));$('cuPlus').addEventListener('click',()=>$('cuGrams').value=num($('cuGrams').value)+1);$('cuSave').addEventListener('click',()=>saveCabinet(false));$('cuEmpty').addEventListener('click',()=>saveCabinet(true));
+$('historySearch').addEventListener('input',renderHistory);$('historyType').addEventListener('change',renderHistory);$('exportHistory').addEventListener('click',exportHistory);
+$('addLocationBtn').addEventListener('click',()=>{const l=tx($('newLocation').value);if(!l||state.locations.includes(l))return;state.locations.push(l);state.products.forEach(p=>p.stockByLocation[l]=0);$('newLocation').value='';save();render()});$('resetData').addEventListener('click',()=>{if(confirm('Wirklich alle lokalen Daten löschen?')){localStorage.removeItem(KEY);location.reload()}});
+$('scannerClose').addEventListener('click',()=>closeScanner());$('scannerCancel').addEventListener('click',()=>closeScanner());
+$('unknownContinue').addEventListener('click',continueUnknown);$('unknownAssign').addEventListener('click',openAssign);$('unknownCreate').addEventListener('click',createUnknown);$('assignClose').addEventListener('click',()=>$('assignDialog').close());$('assignSearch').addEventListener('input',renderAssign);
 
-document.querySelectorAll('.operation-mode').forEach(b=>b.addEventListener('click',()=>setOperationMode(b.dataset.opmode)));
-$('employeeSearch').addEventListener('input',()=>renderRoleSuggestions('employee'));
-$('assetSearch').addEventListener('input',()=>renderRoleSuggestions('asset'));
-$('employeeFindBtn').addEventListener('click',()=>{const p=find($('employeeSearch').value);if(p)openEmployeeSale(p);else toast('Artikel nicht gefunden')});
-$('assetFindBtn').addEventListener('click',()=>{const p=find($('assetSearch').value);if(p)openAssetIssue(p);else toast('Artikel nicht gefunden')});
-$('employeeScanBtn').addEventListener('click',()=>startRoleScanner('employee'));
-$('assetScanBtn').addEventListener('click',()=>startRoleScanner('asset'));
-$('esClose').addEventListener('click',()=>{$('employeeSaleDialog').close();operationProduct=null});
-$('esQty').addEventListener('input',updateEmployeeSaleTotal);$('esPrice').addEventListener('input',updateEmployeeSaleTotal);
-$('esSave').addEventListener('click',saveEmployeeSale);
-$('asClose').addEventListener('click',()=>{$('assetDialog').close();operationProduct=null});
-$('asSave').addEventListener('click',saveAssetIssue);
-
-$('cabinetSearch').addEventListener('input',()=>{renderOperations()});
-$('cabinetScanBtn').addEventListener('click',startCabinetScanner);
-$('cabinetSearchScanBtn').addEventListener('click',startCabinetScanner);
-$('newCabinetBtn').addEventListener('click',openNewCabinet);
-$('coClose').addEventListener('click',()=>{$('cabinetOpenDialog').close();pendingCabinetProduct=null});
-$('coOpen').addEventListener('click',openCabinetPackage);
-$('cuClose').addEventListener('click',()=>{$('cabinetUsageDialog').close();cabinetProduct=null});
-$('cuMinus').addEventListener('click',()=>$('cuGrams').value=Math.max(0,num($('cuGrams').value)-1));
-$('cuPlus').addEventListener('click',()=>$('cuGrams').value=num($('cuGrams').value)+1);
-document.querySelectorAll('[data-grams]').forEach(b=>b.addEventListener('click',()=>$('cuGrams').value=b.dataset.grams));
-$('cuSave').addEventListener('click',()=>saveCabinetUse(false));
-$('cuMarkEmpty').addEventListener('click',()=>saveCabinetUse(true));
-
-$('unknownNo').addEventListener('click',continueAfterUnknown);
-$('unknownAssign').addEventListener('click',openAssignBarcode);
-$('assignClose').addEventListener('click',()=>$('assignBarcodeDialog').close());
-$('assignSearch').addEventListener('input',renderAssignResults);
-$('unknownYes').addEventListener('click',createFromUnknownBarcode);
-$('newArticleBtn')?.addEventListener('click',openNewArticle);
-$('exportCsv').addEventListener('click',exportCsv);$('finishInventory').addEventListener('click',finish);
-$('resetData').addEventListener('click',()=>{if(confirm('Laufende Inventur wirklich löschen?')){products=[];recent=[];localStorage.removeItem(KEY);render();toast('Inventur gelöscht')}});
-$('closeLocationDetail').addEventListener('click',()=>{$('locationDetail').classList.add('hidden');activeLocationDetail=null});
-$('articleScanBtn').addEventListener('click',startArticleScanner);
-$('articleScanClose')?.addEventListener('click',stopArticleScanner);
-$('closeFullScanner').addEventListener('click',async()=>{await closeFullScanner();scannerMode='inventory'});
-$('scannerCancelBtn').addEventListener('click',async()=>{await closeFullScanner();scannerMode='inventory'});
-$('scannerSwitchBtn').addEventListener('click',switchFullCamera);
-$('scannerFlashBtn').addEventListener('click',toggleTorch);
-$('barcodePhotoInput').addEventListener('change',e=>{const f=e.target.files?.[0];if(f)scanBarcodePhoto(f);e.target.value=''});
-$('closeProductDialog').addEventListener('click',()=>{$('scanProductDialog').close();scanProduct=null});
-$('scanPlus').addEventListener('click',()=>$('scanQty').value=num($('scanQty').value)+1);
-$('scanMinus').addEventListener('click',()=>$('scanQty').value=Math.max(0,num($('scanQty').value)-1));
-$('scanSaveContinue').addEventListener('click',()=>saveScanProduct(true));
-$('scanSaveStop').addEventListener('click',()=>saveScanProduct(false));
-$('scanEditProduct').addEventListener('click',()=>{
- if(!scanProduct)return;
- const p=scanProduct;
- $('scanProductDialog').close();
- scanProduct=null;
- openEditProduct(p);
-});
-$('epClose').addEventListener('click',()=>{$('editProductDialog').close();editProduct=null});
-$('epCancel').addEventListener('click',()=>{$('editProductDialog').close();editProduct=null});
-$('epSave').addEventListener('click',saveEditProduct);
-$('epDelete').addEventListener('click',deleteEditProduct);
-$('epExpected').addEventListener('input',updateEditSummary);
-$('epBuy').addEventListener('input',updateEditSummary);
-document.addEventListener('click',e=>{if(!e.target.closest('.article-search-wrap'))$('searchSuggestions').classList.add('hidden')});
-
-if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js').catch(()=>{}));
+if('serviceWorker'in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js').catch(()=>{}));
 load();render();

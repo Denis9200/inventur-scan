@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#080808">
+<meta name="theme-color" content="#070707">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Inventur Scan">
-<title>Inventur Scan · DJ Innovations</title>
+<meta name="apple-mobile-web-app-title" content="DJ Lager">
+<title>DJ Lager & Inventur</title>
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="apple-touch-icon" href="./icon-192.png">
 <link rel="stylesheet" href="./styles.css">
@@ -16,692 +16,141 @@
   <aside class="sidebar">
     <div class="side-brand">
       <img src="./dj-innovations-logo.jpg" alt="DJ Innovations">
-      <div class="product-name">INVENTUR SCAN</div>
+      <div class="product-name">LAGER & INVENTUR</div>
     </div>
-
     <nav class="side-nav">
       <button class="nav-item active" data-page="dashboard"><span>⌂</span>Dashboard</button>
-      <button class="nav-item" data-page="inventory"><span>▣</span>Inventur</button>
       <button class="nav-item" data-page="operations"><span>◉</span>Betrieb</button>
-      <button class="nav-item" data-page="articles"><span>◇</span>Lagerbestand</button>
-      <button class="nav-item" data-page="locations"><span>⌖</span>Lagerorte</button>
-      <button class="nav-item" data-page="stats"><span>▥</span>Auswertung</button>
+      <button class="nav-item" data-page="stock"><span>◇</span>Lagerbestand</button>
+      <button class="nav-item" data-page="inventory"><span>▣</span>Inventur</button>
       <button class="nav-item" data-page="history"><span>◷</span>Historie</button>
       <button class="nav-item" data-page="settings"><span>⚙</span>Einstellungen</button>
     </nav>
-
-    <div class="offline-card">
-      <span class="gold-icon">☁</span>
-      <div><strong>Offline-Modus</strong><small>Daten lokal gespeichert</small></div>
-    </div>
+    <div class="offline-card"><span class="gold-icon">●</span><div><strong>Lokal gespeichert</strong><small>PWA / Offline-fähig</small></div></div>
   </aside>
 
   <main class="main">
     <header class="topbar">
-      <div>
-        <span class="kicker">DJ INNOVATIONS</span>
-        <h1 id="pageHeading">Dashboard</h1>
-        <p id="pageSubheading">Dein Lagerbestand auf einen Blick.</p>
-      </div>
-      <div class="top-actions">
-        <span class="save-pill" id="saveBadge">Bereit</span>
-        <button class="round-btn" id="themeBtn" aria-label="Darstellung wechseln">◐</button>
-      </div>
+      <div><span class="kicker">DJ INNOVATIONS</span><h1 id="pageHeading">Dashboard</h1><p id="pageSubheading">Lager, Betrieb und Inventuren sauber getrennt.</p></div>
+      <div class="top-actions"><span class="save-pill" id="saveBadge">Bereit</span><button class="round-btn" id="themeBtn">◐</button></div>
     </header>
 
     <section class="page active" id="page-dashboard">
       <div class="welcome">
-        <div>
-          <span class="kicker gold">INVENTUR SCAN</span>
-          <h2>Bestand im Blick.<br>Inventur im Griff.</h2>
-          <p>Deine laufende Inventur, Lagerwerte und Abweichungen — alles direkt auf dem Startbildschirm.</p>
-        </div>
-        <div class="welcome-actions">
-          <button class="btn gold-btn" data-go="inventory">Inventur fortsetzen</button>
-          <button class="btn dark-btn" data-go="operations">Betrieb öffnen</button>
-          <label class="btn dark-btn" for="dashImport">Bestand importieren</label>
-          <input id="dashImport" type="file" accept=".csv,.xlsx,.xls" hidden>
-        </div>
+        <div><span class="kicker gold">SALON-WARENWIRTSCHAFT</span><h2>Ein Bestand.<br>Mehrere Arbeitsbereiche.</h2><p>Der Lagerbestand läuft unabhängig. Betrieb bucht Bewegungen. Inventuren arbeiten mit eigenen Snapshots.</p></div>
       </div>
-
+      <div class="module-grid">
+        <button class="module-card" data-go="operations"><b>◉</b><strong>Betrieb</strong><span>Kabinettware, Mitarbeiterverkauf, Arbeitsmittel</span></button>
+        <button class="module-card" data-go="stock"><b>◇</b><strong>Lagerbestand</strong><span>Aktueller operativer Bestand</span></button>
+        <button class="module-card" data-go="inventory"><b>▣</b><strong>Inventur</strong><span>Benannte Inventuren mit eigenem Snapshot</span></button>
+        <button class="module-card" data-go="history"><b>◷</b><strong>Historie</strong><span>Jede Warenbewegung nachvollziehen</span></button>
+      </div>
       <div class="metric-grid">
-        <article class="metric-card">
-          <div class="metric-top"><span>Artikel insgesamt</span><b class="metric-icon">◇</b></div>
-          <strong id="dTotal">0</strong>
-          <small>Produkte im aktuellen Bestand</small>
-        </article>
-        <article class="metric-card">
-          <div class="metric-top"><span>Lagerwert (EK)</span><b class="metric-icon">€</b></div>
-          <strong id="dValue">0,00 €</strong>
-          <small>Wert des gezählten Bestands</small>
-        </article>
-        <article class="metric-card">
-          <div class="metric-top"><span>Inventurfortschritt</span><b class="metric-icon">◔</b></div>
-          <strong id="dPercent">0 %</strong>
-          <div class="progress"><i id="progressBar"></i></div>
-          <small id="dProgressText">0 von 0 Artikeln</small>
-        </article>
-        <article class="metric-card alert-card">
-          <div class="metric-top"><span>Abweichungen</span><b class="metric-icon alert">!</b></div>
-          <strong id="dDiffs">0</strong>
-          <small>Artikel mit Soll-/Ist-Differenz</small>
-        </article>
+        <article class="metric-card"><span>Lagerartikel</span><strong id="dashProducts">0</strong><small>Artikelstamm</small></article>
+        <article class="metric-card"><span>Lagerwert EK</span><strong id="dashStockValue">0,00 €</strong><small>aktueller Bestand</small></article>
+        <article class="metric-card"><span>Offene Kabinettware</span><strong id="dashCabinet">0</strong><small>angebrochene Gebinde</small></article>
+        <article class="metric-card"><span>Salon-Inventar</span><strong id="dashAssets">0</strong><small>Arbeitsmittel im Einsatz</small></article>
       </div>
-
       <div class="dashboard-grid">
-        <article class="panel active-inventory">
-          <div class="panel-head">
-            <div><span class="kicker">AKTIVE INVENTUR</span><h3>Aktuelle Zählung</h3></div>
-            <span class="status-badge" id="activeState">Bereit</span>
-          </div>
-          <div class="active-body">
-            <div>
-              <h4 id="activeTitle">Inventur aktuell</h4>
-              <p>Automatisch lokal gespeichert</p>
-              <button class="btn gold-btn" data-go="inventory">Fortsetzen</button>
-            </div>
-            <div class="ring" id="progressRing"><span id="ringValue">0%</span></div>
-          </div>
-        </article>
-
-        <article class="panel">
-          <div class="panel-head"><div><span class="kicker">LAGERORTE</span><h3>Fortschritt nach Bereich</h3></div></div>
-          <div id="locationOverview" class="location-overview empty">Noch keine Zählung vorhanden.</div>
-        </article>
-
-        <article class="panel">
-          <div class="panel-head"><div><span class="kicker">LETZTE AKTIONEN</span><h3>Zuletzt erfasst</h3></div></div>
-          <div id="recentOverview" class="activity-list empty">Noch nichts erfasst.</div>
-        </article>
-
-        <article class="panel">
-          <div class="panel-head"><div><span class="kicker">BESTAND</span><h3>Handlungsbedarf</h3></div></div>
-          <div class="needs-grid">
-            <div><strong id="belowMin">0</strong><span>unter Mindestbestand</span></div>
-            <div><strong id="openCount">0</strong><span>noch nicht gezählt</span></div>
-          </div>
-          <button class="btn dark-btn full" data-go="articles">Artikel ansehen</button>
-        </article>
+        <article class="panel"><div class="panel-head"><div><span class="kicker gold">AKTIVITÄT</span><h3>Letzte Bewegungen</h3></div></div><div id="dashHistory" class="activity-list empty">Noch keine Bewegungen.</div></article>
+        <article class="panel"><div class="panel-head"><div><span class="kicker gold">INVENTUREN</span><h3>Letzte Inventuren</h3></div><button class="btn dark-btn" data-go="inventory">Öffnen</button></div><div id="dashInventories" class="activity-list empty">Noch keine Inventur.</div></article>
       </div>
+    </section>
 
-      <div class="quick-bar">
-        <button data-go="inventory"><b>▣</b><span>Inventur</span></button>
-        <button data-go="operations"><b>◉</b><span>Betrieb</span></button>
-        <button data-go="articles"><b>◇</b><span>Lagerbestand</span></button>
-        <button data-go="stats"><b>▥</b><span>Auswertung</span></button>
+    <section class="page" id="page-stock">
+      <div class="content-card">
+        <div class="section-head">
+          <div><span class="kicker gold">LAGERBESTAND</span><h2>Aktueller Bestand</h2><p>Dieser Bestand läuft unabhängig von Inventuren und wird durch Betriebsvorgänge verändert.</p></div>
+          <div class="actions"><button class="btn gold-btn" id="newArticleBtn">+ Neuer Artikel</button><label class="btn dark-btn" for="stockImport">CSV importieren</label><input id="stockImport" type="file" accept=".csv,.xlsx,.xls" hidden><button class="btn dark-btn" id="exportStock">CSV exportieren</button></div>
+        </div>
+        <div class="article-search-line"><input id="stockSearch" placeholder="Artikel, Marke, Gruppe oder Barcode suchen …"><button class="btn gold-btn" id="stockScanBtn">▣ Barcode scannen</button></div>
+        <div id="stockCards" class="card-list"></div>
       </div>
     </section>
 
     <section class="page" id="page-inventory">
       <div class="content-card">
         <div class="section-head">
-          <div><span class="kicker gold">INVENTUR</span><h2>Scannen & zählen</h2><p>Dieser Bereich bleibt aus V4 erhalten. Der Scanner-Popup-Umbau kommt als nächster Schritt.</p></div>
-          <label class="btn gold-btn" for="inventoryImport">Bestand importieren</label>
-          <input id="inventoryImport" type="file" accept=".csv,.xlsx,.xls" hidden>
+          <div><span class="kicker gold">INVENTUR</span><h2>Inventuren</h2><p>Eine Inventur übernimmt den Lagerbestand nur beim Start als Snapshot. Danach läuft sie eigenständig.</p></div>
+          <button class="btn gold-btn" id="newInventoryBtn">+ Neue Inventur</button>
         </div>
-
-        <div class="two-col">
-          <div>
-            <label class="field"><span>Lagerort</span><select id="locationSelect"></select></label>
-            <div class="inline-field">
-              <input id="newLocation" placeholder="Neuer Lagerort">
-              <button class="square" id="addLocation">+</button>
-            </div>
-          </div>
-          <div class="scan-box">
-            <div id="scannerIdle">
-              <div class="scan-glyph">▣</div>
-              <h3>Barcode Scanner</h3>
-              <p>Kamera starten oder Barcode manuell suchen.</p>
-              <button class="btn gold-btn" id="startScanner">Kamera starten</button>
-            </div>
-            <div id="scannerLive" class="hidden"><div id="reader"></div><button class="btn dark-btn" id="stopScanner">Scanner schließen</button></div>
-          </div>
-        </div>
-
-        <div class="search-line">
-          <input id="searchInput" placeholder="Barcode oder Artikelname">
-          <button class="btn dark-btn" id="findProduct">Artikel auswählen</button>
-        </div>
-
-        <div id="countPanel" class="count-panel hidden">
-          <div><span class="kicker gold">GEFUNDEN</span><h3 id="countName"></h3><p id="countMeta"></p></div>
-          <div class="counter">
-            <button id="minus">−</button><input id="qty" type="number" min="0" value="1"><button id="plus">+</button>
-          </div>
-          <button class="btn gold-btn full" id="saveCount">Menge speichern & weiter</button>
-        </div>
+        <div id="inventorySessionList" class="inventory-session-list"></div>
       </div>
-
-      <div class="content-card">
-        <div class="section-head"><div><span class="kicker">SOLL / IST</span><h2>Inventurstatus</h2></div><button class="btn dark-btn" id="finishInventory">Inventur abschließen</button></div>
-        <div class="card-list" id="inventoryCards"></div>
-      </div>
-    </section>
-
-    
-    <section class="page" id="page-operations">
-      <div class="page-mode-hero">
-        <div>
-          <span class="kicker gold">BETRIEB</span>
-          <h2>Salonbetrieb</h2>
-          <p>Kabinettware, Mitarbeiterverkauf und Arbeitsmittel direkt mit dem Lagerbestand verbinden.</p>
-        </div>
-        <button class="btn gold-btn" id="cabinetScanBtn">▣ Kabinettware scannen</button>
-      </div>
-
-
-      <div class="operation-modes">
-        <button class="operation-mode active" data-opmode="cabinet">
-          <b>◉</b><span>Kabinettware</span><small>Verbrauch in Gramm</small>
-        </button>
-        <button class="operation-mode" data-opmode="employee">
-          <b>€</b><span>Mitarbeiterverkauf</span><small>z. B. EK + MwSt.</small>
-        </button>
-        <button class="operation-mode" data-opmode="assets">
-          <b>⌘</b><span>Inventar / Arbeitsmittel</span><small>Salonbestand getrennt führen</small>
-        </button>
-      </div>
-
-      <div class="metric-grid">
-        <article class="metric-card">
-          <div class="metric-top"><span>Offene Kabinettware</span><b class="metric-icon">◉</b></div>
-          <strong id="cabOpenCount">0</strong><small>angebrochene Produkte</small>
-        </article>
-        <article class="metric-card">
-          <div class="metric-top"><span>Verbrauch heute</span><b class="metric-icon">g</b></div>
-          <strong id="cabTodayGrams">0 g</strong><small>erfasste Entnahme</small>
-        </article>
-        <article class="metric-card">
-          <div class="metric-top"><span>Leer gemeldet</span><b class="metric-icon">✓</b></div>
-          <strong id="cabEmptyToday">0</strong><small>heute abgeschlossene Gebinde</small>
-        </article>
-        <article class="metric-card">
-          <div class="metric-top"><span>Schwund / Verlust</span><b class="metric-icon alert">!</b></div>
-          <strong id="cabWasteToday">0 g</strong><small>heute dokumentiert</small>
-        </article>
-      </div>
-
-      <div id="op-cabinet" class="operation-panel active">
-      <div class="dashboard-grid">
-        <article class="panel">
-          <div class="panel-head">
-            <div><span class="kicker">KABINETTWARE</span><h3>Aktuell angebrochen</h3></div>
-            <button class="btn dark-btn" id="newCabinetBtn">+ Manuell öffnen</button>
-          </div>
-          <div id="openCabinetList" class="cabinet-list empty">Noch keine Kabinettware geöffnet.</div>
-        </article>
-
-        <article class="panel">
-          <div class="panel-head">
-            <div><span class="kicker">VERBRAUCH</span><h3>Letzte Entnahmen</h3></div>
-          </div>
-          <div id="usageHistory" class="activity-list empty">Noch kein Verbrauch erfasst.</div>
-        </article>
-      </div>
-
-      <div class="content-card">
-        <div class="section-head">
-          <div>
-            <span class="kicker gold">SCHNELLERFASSUNG</span>
-            <h2>Produkt auswählen</h2>
-            <p>Suche bekannte Kabinettware oder scanne direkt den Barcode.</p>
-          </div>
-        </div>
-        <div class="article-search-wrap">
-          <div class="article-search-line">
-            <input id="cabinetSearch" placeholder="Produktname oder Barcode …" autocomplete="off">
-            <button class="btn gold-btn" id="cabinetSearchScanBtn">▣ Scannen</button>
-          </div>
-          <div id="cabinetSuggestions" class="suggestions hidden"></div>
-        </div>
-        <div id="cabinetProductCards" class="card-list"></div>
-      </div>
-      </div>
-
-      <div id="op-employee" class="operation-panel">
+      <div id="activeInventoryArea" class="hidden">
         <div class="content-card">
           <div class="section-head">
-            <div><span class="kicker gold">MITARBEITERVERKAUF</span><h2>Artikel verkaufen</h2><p>Standardpreis kann automatisch aus EK + MwSt. berechnet werden.</p></div>
-            <button class="btn gold-btn" id="employeeScanBtn">▣ Barcode scannen</button>
+            <div><span class="kicker gold">AKTIVE INVENTUR</span><h2 id="invTitle">Inventur</h2><p id="invMeta"></p></div>
+            <div class="actions"><button class="btn gold-btn" id="inventoryScanBtn">▣ Scannen</button><button class="btn dark-btn" id="inventoryFinishBtn">Inventur abschließen</button></div>
           </div>
-          <div class="article-search-wrap">
-            <div class="article-search-line">
-              <input id="employeeSearch" placeholder="Artikel oder Barcode suchen …" autocomplete="off">
-              <button class="btn dark-btn" id="employeeFindBtn">Auswählen</button>
-            </div>
-            <div id="employeeSuggestions" class="suggestions hidden"></div>
+          <div class="metric-grid">
+            <article class="metric-card"><span>Artikel</span><strong id="invTotal">0</strong><small>im Snapshot</small></article>
+            <article class="metric-card"><span>Gezählt</span><strong id="invCounted">0</strong><small>Artikel mit Ist-Wert</small></article>
+            <article class="metric-card"><span>Abweichungen</span><strong id="invDiffs">0</strong><small>Soll ≠ Ist</small></article>
+            <article class="metric-card"><span>Fortschritt</span><strong id="invPercent">0 %</strong><small>der Inventur</small></article>
           </div>
-          <div id="employeeSaleHistory" class="activity-list empty" style="margin-top:14px">Noch keine Mitarbeiterverkäufe.</div>
-        </div>
-      </div>
-
-      <div id="op-assets" class="operation-panel">
-        <div class="dashboard-grid">
-          <article class="panel">
-            <div class="panel-head"><div><span class="kicker gold">ARBEITSMITTEL</span><h3>Als Inventar ausgeben</h3></div><button class="btn gold-btn" id="assetScanBtn">▣ Scannen</button></div>
-            <div class="article-search-wrap">
-              <div class="article-search-line">
-                <input id="assetSearch" placeholder="z. B. Schneidkamm …" autocomplete="off">
-                <button class="btn dark-btn" id="assetFindBtn">Auswählen</button>
-              </div>
-              <div id="assetSuggestions" class="suggestions hidden"></div>
-            </div>
-          </article>
-          <article class="panel">
-            <span class="kicker gold">SALON-INVENTAR</span><h3>Aktive Arbeitsmittel</h3>
-            <div id="assetList" class="activity-list empty">Noch keine Arbeitsmittel ausgegeben.</div>
-          </article>
+          <div class="field-grid">
+            <label class="field"><span>Aktueller Zählort</span><select id="inventoryLocation"></select></label>
+            <div class="field"><span>Manuell erfassen</span><div class="inline-field"><input id="inventorySearch" placeholder="Artikel / Barcode"><button class="btn dark-btn" id="inventoryFindBtn">Öffnen</button></div></div>
+          </div>
+          <div id="inventoryCards" class="card-list"></div>
         </div>
       </div>
     </section>
 
-    <section class="page" id="page-articles">
-      <div class="content-card">
-        <div class="section-head">
-          <div><span class="kicker gold">ARTIKEL</span><h2>Lagerbestand</h2></div>
-          <div class="welcome-actions">
-            <button class="btn gold-btn" id="newArticleBtn">+ Neuer Artikel</button>
-            <button class="btn dark-btn" id="exportCsv">CSV exportieren</button>
-          </div></div>
-        </div>
-
-        <div class="article-search-wrap">
-          <div class="article-search-line">
-            <input id="articleSearch" class="wide-search" placeholder="Artikelname oder Barcode eingeben …" autocomplete="off">
-            <button class="btn gold-btn" id="articleScanBtn">▣ Barcode scannen</button>
-          </div>
-          <div id="searchSuggestions" class="suggestions hidden"></div>
-        </div>
-
-        <div id="articleScannerModal" class="scan-modal hidden">
-          <div class="scan-modal-card">
-            <div class="scan-modal-head">
-              <div><span class="kicker gold">ARTIKELSUCHE</span><h3>Barcode scannen</h3></div>
-              <button class="round-btn" id="articleScanClose">×</button>
-            </div>
-            <div id="articleReader"></div>
-            <p>Barcode in den Rahmen halten. Der passende Artikel wird automatisch geöffnet.</p>
-          </div>
-        </div>
-
-        <div class="card-list" id="articleCards"></div>
+    <section class="page" id="page-operations">
+      <div class="page-mode-hero"><div><span class="kicker gold">BETRIEB</span><h2>Salonbetrieb</h2><p>Jeder Vorgang ist eigenständig und schreibt eine nachvollziehbare Bewegung in die Historie.</p></div></div>
+      <div class="operation-modes">
+        <button class="operation-mode active" data-opmode="stockview"><b>◇</b><span>Lagerbestand</span><small>Schnelle Bestandsübersicht</small></button>
+        <button class="operation-mode" data-opmode="cabinet"><b>◉</b><span>Kabinettware</span><small>Grammgenauer Verbrauch</small></button>
+        <button class="operation-mode" data-opmode="employee"><b>€</b><span>MA Verkauf</span><small>Mitarbeiterverkauf separat</small></button>
+        <button class="operation-mode" data-opmode="assets"><b>⌘</b><span>Inventar</span><small>Arbeitsmittel ausgeben / entfernen</small></button>
       </div>
-    </section>
 
-    <section class="page" id="page-locations">
-      <div class="content-card">
-        <span class="kicker gold">LAGERORTE</span>
-        <h2>Bereiche & Bestände</h2>
-        <p>Tippe auf einen Lagerort, um alle dort gezählten Produkte zu sehen.</p>
-        <div id="locationPage" class="location-page"></div>
+      <div id="op-stockview" class="operation-panel active"><div class="content-card"><div class="section-head"><div><span class="kicker gold">BETRIEB · LAGER</span><h2>Aktueller Lagerbestand</h2></div><button class="btn dark-btn" data-go="stock">Kompletten Lagerbestand öffnen</button></div><div id="operationStockCards" class="card-list"></div></div></div>
 
-        <div id="locationDetail" class="location-detail hidden">
-          <div class="location-detail-head">
-            <div>
-              <span class="kicker gold">LAGERORT</span>
-              <h2 id="locationDetailTitle">Salon</h2>
-              <p id="locationDetailMeta"></p>
-            </div>
-            <button class="btn dark-btn" id="closeLocationDetail">Übersicht</button>
-          </div>
-          <div id="locationProducts" class="location-products"></div>
-        </div>
-      </div>
-    </section>
+      <div id="op-cabinet" class="operation-panel"><div class="content-card"><div class="section-head"><div><span class="kicker gold">KABINETTWARE</span><h2>Verbrauch erfassen</h2></div><button class="btn gold-btn" id="cabinetScanBtn">▣ Produkt scannen</button></div><div class="article-search-line"><input id="cabinetSearch" placeholder="Kabinettware suchen …"><button class="btn dark-btn" id="cabinetFindBtn">Öffnen</button></div><h3>Offene Gebinde</h3><div id="openCabinetList" class="cabinet-list empty">Noch keine offene Kabinettware.</div><h3>Letzte Kabinettbewegungen</h3><div id="cabinetHistory" class="activity-list empty">Noch keine Bewegung.</div></div></div>
 
-    <section class="page" id="page-stats">
-      <div class="metric-grid">
-        <article class="metric-card"><span>Soll-Lagerwert</span><strong id="sExpected">0,00 €</strong><small>EK</small></article>
-        <article class="metric-card"><span>Gezählter Lagerwert</span><strong id="sCounted">0,00 €</strong><small>EK</small></article>
-        <article class="metric-card"><span>VK-Wert</span><strong id="sRetail">0,00 €</strong><small>gezählt</small></article>
-        <article class="metric-card"><span>Potenzielle Marge</span><strong id="sMargin">0,00 €</strong><small>VK − EK</small></article>
-      </div>
-      <div class="dashboard-grid">
-        <article class="panel"><span class="kicker gold">BESTELLUNG</span><h3>Bestellvorschläge</h3><div id="orders"></div></article>
-        <article class="panel"><span class="kicker gold">LAGERORTE</span><h3>Gezählte Werte</h3><div id="locationStats"></div></article>
-      </div>
+      <div id="op-employee" class="operation-panel"><div class="content-card"><div class="section-head"><div><span class="kicker gold">MITARBEITERVERKAUF</span><h2>Artikel an Mitarbeiter verkaufen</h2></div><button class="btn gold-btn" id="employeeScanBtn">▣ Scannen</button></div><div class="article-search-line"><input id="employeeSearch" placeholder="Mitarbeiterware suchen …"><button class="btn dark-btn" id="employeeFindBtn">Öffnen</button></div><h3>Letzte Mitarbeiterverkäufe</h3><div id="employeeHistory" class="activity-list empty">Noch keine Verkäufe.</div></div></div>
+
+      <div id="op-assets" class="operation-panel"><div class="dashboard-grid"><article class="panel"><div class="panel-head"><div><span class="kicker gold">AUSGEBEN</span><h3>Arbeitsmittel ins Inventar</h3></div><button class="btn gold-btn" id="assetScanBtn">▣ Scannen</button></div><div class="article-search-line"><input id="assetSearch" placeholder="Arbeitsmittel suchen …"><button class="btn dark-btn" id="assetFindBtn">Öffnen</button></div></article><article class="panel"><span class="kicker gold">AKTIVES INVENTAR</span><h3>Im Salon im Einsatz</h3><div id="assetList" class="activity-list empty">Noch keine Arbeitsmittel.</div></article></div></div>
     </section>
 
     <section class="page" id="page-history">
-      <div class="content-card"><span class="kicker gold">HISTORIE</span><h2>Abgeschlossene Inventuren</h2><div id="history"></div></div>
+      <div class="content-card">
+        <div class="section-head"><div><span class="kicker gold">HISTORIE</span><h2>Warenbewegungen</h2><p>Alle Bereiche laufen unabhängig, aber jede Veränderung landet hier.</p></div><button class="btn dark-btn" id="exportHistory">Historie exportieren</button></div>
+        <div class="history-filters"><input id="historySearch" placeholder="Artikel, Grund, Mitarbeiter, Bereich …"><select id="historyType"><option value="">Alle Bewegungen</option><option value="stock_import">Bestandsimport</option><option value="employee_sale">Mitarbeiterverkauf</option><option value="cabinet_open">Kabinettware geöffnet</option><option value="cabinet_use">Kabinettverbrauch</option><option value="cabinet_waste">Schwund / Verlust</option><option value="cabinet_empty">Gebinde leer</option><option value="asset_issue">Ins Inventar</option><option value="asset_remove">Aus Inventar entfernt</option><option value="asset_return">Zurück ins Lager</option><option value="stock_adjust">Bestandsänderung</option></select></div>
+        <div id="historyList" class="history-list empty">Noch keine Warenbewegungen.</div>
+      </div>
     </section>
 
     <section class="page" id="page-settings">
-      <div class="dashboard-grid">
-        <article class="panel"><span class="kicker gold">DARSTELLUNG</span><h3>DJ Innovations Theme</h3><p>Schwarz-Gold ist als Hauptdesign aktiv. Über den Button oben rechts kannst du eine hellere Ansicht testen.</p></article>
-        <article class="panel"><span class="kicker gold">DATEN</span><h3>Lokale Speicherung</h3><p>Die Testversion speichert die laufende Inventur lokal auf diesem Gerät.</p><button class="btn danger-btn" id="resetData">Laufende Inventur löschen</button></article>
-      </div>
+      <div class="dashboard-grid"><article class="panel"><span class="kicker gold">LAGERORTE</span><h3>Lagerorte verwalten</h3><div class="inline-field"><input id="newLocation" placeholder="z. B. Keller"><button class="btn gold-btn" id="addLocationBtn">+</button></div><div id="locationList" class="activity-list"></div></article><article class="panel"><span class="kicker gold">DATEN</span><h3>Lokale Daten</h3><p>Die aktuelle Testversion speichert alles lokal auf diesem Gerät.</p><button class="btn danger-btn" id="resetData">Alle lokalen Daten löschen</button></article></div>
     </section>
   </main>
 </div>
 
+<dialog id="newInventoryDialog" class="app-dialog"><div class="dialog-body"><div class="dialog-head"><div><span class="kicker gold">NEUE INVENTUR</span><h2>Inventur starten</h2></div><button class="round-btn" id="newInvClose">×</button></div><label class="field"><span>Name der Inventur</span><input id="newInvName" placeholder="z. B. Jahresinventur 2026"></label><p class="muted">Beim Start wird der aktuelle Lagerbestand kopiert. Spätere Betriebsvorgänge verändern diese Inventur nicht.</p><button class="btn gold-btn full" id="createInventoryBtn">Snapshot erstellen & starten</button></div></dialog>
 
-<div id="fullScannerModal" class="fullscreen-scanner hidden">
-  <div class="scanner-top">
-    <div>
-      <span class="kicker gold">INVENTUR</span>
-      <h2>Barcode scannen</h2>
-    </div>
-    <button id="closeFullScanner" class="round-btn">×</button>
-  </div>
+<dialog id="countDialog" class="app-dialog"><div class="dialog-body"><div class="dialog-head"><div><span class="kicker gold">INVENTUR</span><h2 id="countName">Artikel</h2><p id="countMeta"></p></div><button class="round-btn" id="countClose">×</button></div><label class="field"><span>Zählort</span><select id="countLocation"></select></label><div class="scan-counter"><button id="countMinus">−</button><input id="countQty" type="number" min="0" step="1" value="1"><button id="countPlus">+</button></div><button class="btn gold-btn full" id="countSave">Menge addieren</button></div></dialog>
 
-  <div class="scanner-stage">
-    <div id="quaggaReader"></div>
-    <div class="scan-overlay">
-      <div class="scan-frame"></div>
-      <span>Barcode in den Rahmen halten</span>
-    </div>
-  </div>
+<dialog id="productDialog" class="app-dialog large-dialog"><div class="dialog-body"><div class="dialog-head"><div><span class="kicker gold">ARTIKEL</span><h2 id="pdTitle">Artikel bearbeiten</h2></div><button class="round-btn" id="pdClose">×</button></div><div class="edit-grid"><label class="field"><span>Name</span><input id="pdName"></label><label class="field"><span>Barcode</span><input id="pdBarcode"></label><label class="field"><span>Marke</span><input id="pdBrand"></label><label class="field"><span>Produktgruppe</span><input id="pdGroup"></label><label class="field"><span>EK €</span><input id="pdBuy" type="number" min="0" step="0.01"></label><label class="field"><span>VK €</span><input id="pdSell" type="number" min="0" step="0.01"></label><label class="field"><span>Mindestbestand</span><input id="pdMin" type="number" min="0"></label><label class="field"><span>Inhalt pro VE (g)</span><input id="pdPackageGrams" type="number" min="0"></label></div><div class="edit-section"><span class="kicker gold">VERWENDUNG</span><div class="role-grid"><label class="role-check"><input id="pdRetail" type="checkbox"><div><strong>Kundenverkauf</strong><small>Ladenware</small></div></label><label class="role-check"><input id="pdEmployee" type="checkbox"><div><strong>MA Verkauf</strong><small>EK + MwSt. / Festpreis</small></div></label><label class="role-check"><input id="pdCabinet" type="checkbox"><div><strong>Kabinettware</strong><small>Verbrauch in Gramm</small></div></label><label class="role-check"><input id="pdAsset" type="checkbox"><div><strong>Inventar</strong><small>Arbeitsmittel</small></div></label></div></div><div class="edit-grid"><label class="field"><span>MA Preisregel</span><select id="pdEmployeePricing"><option value="ek_vat">EK + MwSt.</option><option value="fixed">Festpreis</option></select></label><label class="field"><span>MwSt. %</span><input id="pdVat" type="number" min="0" value="19"></label><label class="field"><span>Fester MA-Preis €</span><input id="pdEmployeePrice" type="number" min="0" step="0.01"></label></div><div class="edit-section"><span class="kicker gold">LAGERBESTAND</span><h3>Bestand pro Lagerort</h3><div id="pdLocations" class="edit-locations"></div></div><div class="edit-actions"><button class="btn danger-btn" id="pdDelete">Artikel löschen</button><div><button class="btn dark-btn" id="pdCancel">Abbrechen</button><button class="btn gold-btn" id="pdSave">Speichern</button></div></div></div></dialog>
 
-  <div class="scanner-bottom">
-    <button class="scanner-tool" id="scannerFlashBtn"><span>⌁</span><small>Taschenlampe</small></button>
-    <button class="scanner-tool scanner-cancel" id="scannerCancelBtn"><span>×</span><small>Abbrechen</small></button>
-    <button class="scanner-tool" id="scannerSwitchBtn"><span>↻</span><small>Kamera wechseln</small></button>
-  </div>
-  <div class="ios-fallback">
-    <label class="btn dark-btn" for="barcodePhotoInput">Foto scannen</label>
-    <input id="barcodePhotoInput" type="file" accept="image/*" capture="environment" hidden>
-    <span>Fallback für iPhone/iPad, falls Live-Scan nicht sauber erkennt.</span>
-  </div>
-  <div id="fileScanReader" class="hidden"></div>
-  <div class="scanner-ready"><i></i> Scanner bereit</div>
-</div>
+<dialog id="employeeDialog" class="app-dialog"><div class="dialog-body"><div class="dialog-head"><div><span class="kicker gold">MA VERKAUF</span><h2 id="esName">Artikel</h2></div><button class="round-btn" id="esClose">×</button></div><div class="edit-grid"><label class="field"><span>Lagerort</span><select id="esLocation"></select></label><label class="field"><span>Menge</span><input id="esQty" type="number" min="1" value="1"></label><label class="field"><span>Preis/Stück €</span><input id="esPrice" type="number" min="0" step="0.01"></label><label class="field"><span>Mitarbeiter / Notiz</span><input id="esEmployee"></label></div><div class="edit-summary"><div><span>EK</span><strong id="esEk">0 €</strong></div><div><span>Preis/Stück</span><strong id="esUnit">0 €</strong></div><div><span>Gesamt</span><strong id="esTotal">0 €</strong></div></div><button class="btn gold-btn full" id="esSave">Verkauf buchen</button></div></dialog>
 
-<dialog id="scanProductDialog" class="product-scan-dialog">
-  <div class="product-scan-body">
-    <div class="product-scan-head">
-      <div>
-        <span class="kicker gold">ARTIKEL GEFUNDEN</span>
-        <h2 id="scanProductName">Artikel</h2>
-        <p id="scanProductBarcode"></p>
-      </div>
-      <button id="closeProductDialog" class="round-btn">×</button>
-    </div>
+<dialog id="assetIssueDialog" class="app-dialog"><div class="dialog-body"><div class="dialog-head"><div><span class="kicker gold">INVENTAR</span><h2 id="aiName">Arbeitsmittel</h2></div><button class="round-btn" id="aiClose">×</button></div><div class="edit-grid"><label class="field"><span>Aus Lagerort</span><select id="aiLocation"></select></label><label class="field"><span>Anzahl</span><input id="aiQty" type="number" min="1" value="1"></label><label class="field"><span>Bereich / Einsatzort</span><input id="aiArea" placeholder="z. B. Platz 3"></label><label class="field"><span>Notiz</span><input id="aiNote"></label></div><button class="btn gold-btn full" id="aiSave">Ins Inventar ausgeben</button></div></dialog>
 
-    <div class="product-summary">
-      <div><span>Sollbestand</span><strong id="scanSoll">0</strong></div>
-      <div><span>Bereits gezählt</span><strong id="scanIst">0</strong></div>
-      <div><span>Differenz</span><strong id="scanDiff">0</strong></div>
-    </div>
+<dialog id="assetRemoveDialog" class="app-dialog"><div class="dialog-body"><div class="dialog-head"><div><span class="kicker gold">INVENTAR</span><h2 id="arName">Arbeitsmittel entfernen</h2></div><button class="round-btn" id="arClose">×</button></div><div class="edit-grid"><label class="field"><span>Anzahl</span><input id="arQty" type="number" min="1" value="1"></label><label class="field"><span>Grund</span><select id="arReason"><option value="defekt">Defekt</option><option value="verloren">Verloren</option><option value="entsorgt">Entsorgt</option><option value="return">Zurück ins Lager</option><option value="sonstiges">Sonstiges</option></select></label><label class="field"><span>Bei Rückgabe: Lagerort</span><select id="arLocation"></select></label><label class="field"><span>Notiz</span><input id="arNote"></label></div><button class="btn gold-btn full" id="arSave">Inventarbestand aktualisieren</button></div></dialog>
 
-    <label class="field">
-      <span>Lagerort</span>
-      <select id="scanLocation"></select>
-    </label>
+<dialog id="cabinetDialog" class="app-dialog"><div class="dialog-body"><div class="dialog-head"><div><span class="kicker gold">KABINETTWARE</span><h2 id="cuName">Produkt</h2><p id="cuMeta"></p></div><button class="round-btn" id="cuClose">×</button></div><div id="cabinetOpenBlock" class="hidden"><p>Noch kein Gebinde geöffnet.</p><div class="edit-grid"><label class="field"><span>Inhalt pro VE (g)</span><input id="cuPackage" type="number" min="1"></label><label class="field"><span>Lagerort</span><select id="cuOpenLocation"></select></label></div><button class="btn gold-btn full" id="cuOpenPackage">Neue VE öffnen</button></div><div id="cabinetUseBlock" class="hidden"><div class="edit-summary"><div><span>VE</span><strong id="cuPackageShow">0 g</strong></div><div><span>Rest</span><strong id="cuRemaining">0 g</strong></div><div><span>Verbraucht</span><strong id="cuUsed">0 g</strong></div></div><label class="field"><span>Lagerort / Kabinett</span><select id="cuLocation"></select></label><div class="scan-counter"><button id="cuMinus">−</button><input id="cuGrams" type="number" min="0" value="10"><button id="cuPlus">+</button></div><div class="edit-grid"><label class="field"><span>Buchungsart</span><select id="cuType"><option value="use">Verbrauch</option><option value="waste">Schwund / Verlust</option></select></label><label class="field"><span>Notiz</span><input id="cuNote"></label></div><div class="actions"><button class="btn dark-btn" id="cuEmpty">Gebinde ist leer</button><button class="btn gold-btn" id="cuSave">Verbrauch speichern</button></div></div></div></dialog>
 
-    <div class="scan-counter">
-      <button id="scanMinus">−</button>
-      <input id="scanQty" type="number" min="0" step="1" value="1" inputmode="numeric">
-      <button id="scanPlus">+</button>
-    </div>
+<dialog id="unknownDialog" class="app-dialog"><div class="dialog-body center"><div class="unknown-icon">?</div><span class="kicker gold">UNBEKANNTER BARCODE</span><h2>Artikel nicht gefunden</h2><p>Barcode <strong id="unknownCode"></strong></p><div class="unknown-actions"><button class="btn dark-btn" id="unknownContinue">Weiter scannen</button><button class="btn dark-btn" id="unknownAssign">Vorhandenem Artikel zuordnen</button><button class="btn gold-btn" id="unknownCreate">Neuen Artikel anlegen</button></div></div></dialog>
 
-    <button class="btn gold-btn full" id="scanSaveContinue">Speichern & weiter</button>
-    <button class="btn dark-btn full" id="scanEditProduct">Artikel bearbeiten</button>
-    <button class="btn dark-btn full" id="scanSaveStop">Speichern & Scanner beenden</button>
-  </div>
-</dialog>
+<dialog id="assignDialog" class="app-dialog"><div class="dialog-body"><div class="dialog-head"><div><span class="kicker gold">BARCODE ZUORDNEN</span><h2>Artikel auswählen</h2></div><button class="round-btn" id="assignClose">×</button></div><input id="assignSearch" placeholder="Artikel suchen …"><div id="assignResults" class="assign-results"></div></div></dialog>
 
-
-
-
-<dialog id="cabinetUsageDialog" class="edit-product-dialog">
-  <div class="edit-product-body">
-    <div class="dialog-head">
-      <div>
-        <span class="kicker gold">KABINETTWARE</span>
-        <h2 id="cuName">Produkt</h2>
-        <p id="cuBarcode"></p>
-      </div>
-      <button class="round-btn" id="cuClose">×</button>
-    </div>
-
-    <div class="cabinet-status-grid">
-      <div><span>Inhalt pro VE</span><strong id="cuPackage">0 g</strong></div>
-      <div><span>Aktuell offen</span><strong id="cuRemaining">0 g</strong></div>
-      <div><span>Entnommen gesamt</span><strong id="cuUsed">0 g</strong></div>
-    </div>
-
-    <label class="field">
-      <span>Lagerort / Kabinett</span>
-      <select id="cuLocation"></select>
-    </label>
-
-    <div class="edit-section">
-      <span class="kicker gold">ENTNAHME</span>
-      <h3>Wie viel wurde verwendet?</h3>
-      <div class="scan-counter">
-        <button id="cuMinus">−</button>
-        <input id="cuGrams" type="number" min="0" step="1" value="10" inputmode="decimal">
-        <button id="cuPlus">+</button>
-      </div>
-      <div class="preset-row">
-        <button type="button" data-grams="5">5 g</button>
-        <button type="button" data-grams="10">10 g</button>
-        <button type="button" data-grams="20">20 g</button>
-        <button type="button" data-grams="30">30 g</button>
-      </div>
-    </div>
-
-    <div class="cabinet-note-row">
-      <label class="field">
-        <span>Art der Buchung</span>
-        <select id="cuType">
-          <option value="use">Verbrauch Kundin</option>
-          <option value="waste">Schwund / Verlust</option>
-        </select>
-      </label>
-      <label class="field">
-        <span>Notiz (optional)</span>
-        <input id="cuNote" placeholder="z. B. Ansatz Farbe">
-      </label>
-    </div>
-
-    <div class="cabinet-actions">
-      <button class="btn dark-btn" id="cuMarkEmpty">Tube / Gebinde ist leer</button>
-      <button class="btn gold-btn" id="cuSave">Verbrauch speichern</button>
-    </div>
-  </div>
-</dialog>
-
-<dialog id="cabinetOpenDialog" class="edit-product-dialog">
-  <div class="edit-product-body">
-    <div class="dialog-head">
-      <div><span class="kicker gold">KABINETTWARE ÖFFNEN</span><h2 id="coName">Produkt</h2></div>
-      <button class="round-btn" id="coClose">×</button>
-    </div>
-    <p>Für dieses Produkt ist aktuell kein offenes Gebinde vorhanden.</p>
-    <div class="edit-grid">
-      <label class="field"><span>Inhalt pro VE (g)</span><input id="coPackageGrams" type="number" min="1"></label>
-      <label class="field"><span>Lagerort / Kabinett</span><select id="coLocation"></select></label>
-    </div>
-    <p class="muted">Beim Öffnen wird eine ganze Verkaufseinheit aus dem Stückbestand entnommen und als angebrochene Kabinettware geführt.</p>
-    <button class="btn gold-btn full" id="coOpen">Neue Tube / neues Gebinde öffnen</button>
-  </div>
-</dialog>
-
-
-<dialog id="employeeSaleDialog" class="edit-product-dialog">
-  <div class="edit-product-body">
-    <div class="dialog-head">
-      <div><span class="kicker gold">MITARBEITERVERKAUF</span><h2 id="esName">Artikel</h2><p id="esMeta"></p></div>
-      <button class="round-btn" id="esClose">×</button>
-    </div>
-    <div class="edit-grid">
-      <label class="field"><span>Lagerort</span><select id="esLocation"></select></label>
-      <label class="field"><span>Menge</span><input id="esQty" type="number" min="1" value="1"></label>
-      <label class="field"><span>Preis pro Stück €</span><input id="esPrice" type="number" min="0" step="0.01"></label>
-      <label class="field"><span>Mitarbeiter / Notiz</span><input id="esEmployee" placeholder="optional"></label>
-    </div>
-    <div class="edit-summary">
-      <div><span>EK</span><strong id="esEk">0,00 €</strong></div>
-      <div><span>Mitarbeiterpreis</span><strong id="esUnitPrice">0,00 €</strong></div>
-      <div><span>Gesamt</span><strong id="esTotalPrice">0,00 €</strong></div>
-    </div>
-    <button class="btn gold-btn full" id="esSave">Verkauf buchen</button>
-  </div>
-</dialog>
-
-<dialog id="assetDialog" class="edit-product-dialog">
-  <div class="edit-product-body">
-    <div class="dialog-head">
-      <div><span class="kicker gold">INVENTAR / ARBEITSMITTEL</span><h2 id="asName">Artikel</h2><p id="asMeta"></p></div>
-      <button class="round-btn" id="asClose">×</button>
-    </div>
-    <div class="edit-grid">
-      <label class="field"><span>Aus Lagerort</span><select id="asLocation"></select></label>
-      <label class="field"><span>Anzahl ins Salon-Inventar</span><input id="asQty" type="number" min="1" value="1"></label>
-      <label class="field"><span>Bereich / Einsatzort</span><input id="asArea" placeholder="z. B. Platz 3"></label>
-      <label class="field"><span>Notiz</span><input id="asNote" placeholder="optional"></label>
-    </div>
-    <button class="btn gold-btn full" id="asSave">Als Inventar ausgeben</button>
-  </div>
-</dialog>
-
-<dialog id="assignBarcodeDialog" class="edit-product-dialog">
-  <div class="edit-product-body">
-    <div class="dialog-head">
-      <div><span class="kicker gold">BARCODE ZUORDNEN</span><h2>Vorhandenen Artikel auswählen</h2><p>Der gescannte Barcode <strong id="assignBarcodeValue"></strong> wird dem gewählten Artikel zugeordnet.</p></div>
-      <button class="round-btn" id="assignClose">×</button>
-    </div>
-    <input id="assignSearch" placeholder="Artikelname suchen …" autocomplete="off">
-    <div id="assignResults" class="assign-results"></div>
-  </div>
-</dialog>
-
-<dialog id="unknownBarcodeDialog" class="unknown-barcode-dialog">
-  <div class="unknown-barcode-body">
-    <div class="unknown-icon">?</div>
-    <span class="kicker gold">UNBEKANNTER BARCODE</span>
-    <h2>Artikel nicht gefunden</h2>
-    <p>Der Barcode <strong id="unknownBarcodeValue">–</strong> ist noch keinem Artikel zugeordnet.</p>
-    <p>Möchtest du diesen Artikel jetzt neu anlegen?</p>
-    <div class="unknown-actions unknown-actions-three">
-      <button class="btn dark-btn" id="unknownNo">Weiter scannen</button>
-      <button class="btn dark-btn" id="unknownAssign">Vorhandenem Artikel zuordnen</button>
-      <button class="btn gold-btn" id="unknownYes">Neuen Artikel anlegen</button>
-    </div>
-  </div>
-</dialog>
-
-<dialog id="editProductDialog" class="edit-product-dialog">
-  <div class="edit-product-body">
-    <div class="dialog-head">
-      <div>
-        <span class="kicker gold">ARTIKEL BEARBEITEN</span>
-        <h2 id="epTitle">Artikel</h2>
-      </div>
-      <button class="round-btn" id="epClose">×</button>
-    </div>
-
-    <div class="edit-grid">
-      <label class="field">
-        <span>Artikelname</span>
-        <input id="epName">
-      </label>
-      <label class="field">
-        <span>Barcode</span>
-        <input id="epBarcode" inputmode="numeric">
-      </label>
-      <label class="field">
-        <span>Marke / Hersteller</span>
-        <input id="epBrand">
-      </label>
-      <label class="field">
-        <span>Produktgruppe</span>
-        <input id="epGroup">
-      </label>
-      <label class="field">
-        <span>Sollbestand</span>
-        <input id="epExpected" type="number" min="0">
-      </label>
-      <label class="field">
-        <span>Mindestbestand</span>
-        <input id="epMin" type="number" min="0">
-      </label>
-      <label class="field">
-        <span>Einkaufspreis €</span>
-        <input id="epBuy" type="number" min="0" step="0.01">
-      </label>
-      <label class="field">
-        <span>Verkaufspreis €</span>
-        <input id="epSell" type="number" min="0" step="0.01">
-      </label>
-      <label class="field">
-        <span>Bestandseinheit</span>
-        <select id="epUnit">
-          <option value="piece">Stück / ganze VE</option>
-          <option value="gram">Kabinettware in Gramm</option>
-        </select>
-      </label>
-      <label class="field">
-        <span>Inhalt pro VE (g)</span>
-        <input id="epPackageGrams" type="number" min="0" step="1" placeholder="z. B. 60">
-      </label>
-    </div>
-
-
-    <div class="edit-section">
-      <span class="kicker gold">VERWENDUNG</span>
-      <h3>Wofür darf dieser Artikel verwendet werden?</h3>
-      <div class="role-grid">
-        <label class="role-check"><input id="roleRetail" type="checkbox"><div><strong>Kundenverkauf</strong><small>Normale Ladenware</small></div></label>
-        <label class="role-check"><input id="roleEmployee" type="checkbox"><div><strong>Mitarbeiterverkauf</strong><small>z. B. EK + MwSt.</small></div></label>
-        <label class="role-check"><input id="roleCabinet" type="checkbox"><div><strong>Kabinettware</strong><small>Verbrauch im Betrieb</small></div></label>
-        <label class="role-check"><input id="roleAsset" type="checkbox"><div><strong>Inventar / Arbeitsmittel</strong><small>Bleibt im Salon</small></div></label>
-      </div>
-      <div class="edit-grid role-settings">
-        <label class="field">
-          <span>Mitarbeiter-Preisregel</span>
-          <select id="epEmployeePricing">
-            <option value="ek_vat">EK + MwSt.</option>
-            <option value="fixed">Fester Mitarbeiterpreis</option>
-          </select>
-        </label>
-        <label class="field">
-          <span>MwSt. für Mitarbeiterverkauf (%)</span>
-          <input id="epVatRate" type="number" min="0" step="0.1" value="19">
-        </label>
-        <label class="field">
-          <span>Fester Mitarbeiterpreis €</span>
-          <input id="epEmployeePrice" type="number" min="0" step="0.01">
-        </label>
-        <label class="field">
-          <span>Als Inventar ausgegeben</span>
-          <input id="epAssetCount" type="number" min="0" step="1">
-        </label>
-      </div>
-    </div>
-
-    <div class="edit-section">
-      <div class="section-head">
-        <div>
-          <span class="kicker gold">LAGERORTE</span>
-          <h3>Aktueller Lagerbestand pro Lagerort</h3>
-        </div>
-      </div>
-      <div id="epLocations" class="edit-locations"></div>
-    </div>
-
-    <div class="edit-summary">
-      <div><span>Gesamt gezählt</span><strong id="epTotal">0</strong></div>
-      <div><span>Differenz</span><strong id="epDiff">0</strong></div>
-      <div><span>Lagerwert EK</span><strong id="epValue">0,00 €</strong></div>
-    </div>
-
-    <div class="edit-actions">
-      <button class="btn danger-btn" id="epDelete">Artikel löschen</button>
-      <div>
-        <button class="btn dark-btn" id="epCancel">Abbrechen</button>
-        <button class="btn gold-btn" id="epSave">Änderungen speichern</button>
-      </div>
-    </div>
-  </div>
-</dialog>
+<div id="scannerModal" class="fullscreen-scanner hidden"><div class="scanner-top"><div><span class="kicker gold">SCANNER</span><h2 id="scannerTitle">Barcode scannen</h2></div><button class="round-btn" id="scannerClose">×</button></div><div class="scanner-stage"><div id="quaggaReader"></div><div class="scan-overlay"><div class="scan-frame"></div><span>Barcode ruhig in den Rahmen halten</span></div></div><div class="scanner-bottom"><button class="scanner-tool" id="scannerCancel"><span>×</span><small>Abbrechen</small></button></div></div>
 
 <div id="toast" class="toast hidden"></div>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@ericblade/quagga2@1.12.1/dist/quagga.min.js"></script>
 <script src="./app.js"></script>
 </body>

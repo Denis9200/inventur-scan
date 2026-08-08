@@ -1,13 +1,11 @@
 {
-  "name": "Inventur Scan – DJ Innovations",
-  "short_name": "Inventur Scan",
-  "description": "Lagerbestand und mobile Inventur.",
+  "name": "DJ Lager & Inventur",
+  "short_name": "DJ Lager",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "background_color": "#060606",
-  "theme_color": "#080808",
-  "orientation": "any",
+  "theme_color": "#070707",
   "icons": [
     {
       "src": "icon-192.png",

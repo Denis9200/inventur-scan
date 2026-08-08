@@ -1,72 +1,48 @@
-# Inventur Scan V7 – Lagerbestand, Verwendungszwecke & echter CSV-Import
+# DJ Lager & Inventur V8
 
-## Echter CSV-Import
-Auf den hochgeladenen Export abgestimmt:
-- Name
-- Produktmarke
-- Produktgruppe
-- Preis
-- Einkaufspreis
-- Bestand
+Komplette Neuorganisation der bisherigen Inventur-App.
 
-Die Datei darf wie der echte Export mit `Produkte` + Leerzeile beginnen.
-Die App sucht die tatsächliche Kopfzeile automatisch.
+## Hauptbereiche
+- Dashboard
+- Betrieb
+  - Lagerbestand
+  - Kabinettware
+  - Mitarbeiterverkauf
+  - Inventar / Arbeitsmittel
+- Lagerbestand
+- Inventur
+- Historie
 
-Wichtig: Der aktuelle Export enthält keine Barcode-Spalte.
-Daher gibt es bei unbekanntem Scan jetzt:
-- Weiter scannen
-- Vorhandenem Artikel zuordnen
-- Neuen Artikel anlegen
+## Lagerbestand
+Der operative Lagerbestand ist unabhängig von Inventuren.
+Betriebsvorgänge wie Mitarbeiterverkauf, Kabinettware oder Inventar verändern nur den Lagerbestand und schreiben einen Historieneintrag.
 
-Damit kann ein gescannter Barcode einem bereits importierten CSV-Artikel zugeordnet werden.
+## Inventur
+Eine neue Inventur erhält einen frei wählbaren Namen.
+Beim Start wird ein Snapshot des aktuellen Lagerbestands erzeugt.
+Danach verändert sich die Inventur nicht durch spätere Betriebsvorgänge.
+Eine abgeschlossene Inventur verändert den Lagerbestand derzeit bewusst nicht automatisch.
 
-## Datenmodell
-Lagerbestand und Inventurzählung sind jetzt getrennt:
-- `stockByLocation` = aktueller operativer Lagerbestand
-- `counts` = Ist-Zählung während einer Inventur
-- `expected` = Sollbestand der Inventur
-
-## Verwendungszwecke pro Artikel
-Ein Artikel kann mehrere Rollen gleichzeitig haben:
-- Kundenverkauf
+## Historie
+Zentrale Warenbewegungen:
+- Bestandsimport
+- manuelle Bestandsänderung
 - Mitarbeiterverkauf
-- Kabinettware
-- Inventar / Arbeitsmittel
-
-Beispiel Schneidkamm:
-Ein Teil bleibt normaler Lagerbestand, einzelne Stück können als Salon-Inventar ausgegeben werden.
-
-## Mitarbeiterverkauf
-- Artikel für Mitarbeiterverkauf freigeben
-- Standardpreis EK + MwSt.
-- MwSt.-Satz pro Artikel änderbar
-- alternativ fester Mitarbeiterpreis
-- Menge + Lagerort auswählen
-- Verkauf zieht direkt aus dem operativen Lagerbestand ab
-- Verlauf wird gespeichert
+- Kabinettware geöffnet
+- Verbrauch
+- Schwund
+- Gebinde leer
+- ins Inventar überführt
+- Inventar defekt/verloren/entsorgt
+- zurück ins Lager
 
 ## Inventar / Arbeitsmittel
-- Artikel als Arbeitsmittel freigeben
-- Stückzahl aus einem Lagerort ins Salon-Inventar ausgeben
-- Lagerbestand sinkt
-- Inventar-Anzahl steigt
-- Bereich / Einsatzort + Notiz möglich
+Arbeitsmittel können aus dem Lager ins Salon-Inventar überführt werden.
+Später können sie mit Grund entfernt oder wieder zurück ins Lager gelegt werden.
 
-## Kabinettware
-Bestehende Gramm-/Tube-Logik bleibt erhalten:
-- Gramm pro VE
-- offene Tube
-- Entnahme
-- Schwund
-- Tube leer
-- neue Tube öffnet aus Lagerbestand
+## Scanner
+Quagga2, stabilisierte Mehrfacherkennung und EAN/UPC-Prüfziffer.
+Unbekannte Barcodes können einem bestehenden Artikel zugeordnet oder neu angelegt werden.
 
-## Artikelstamm
-Zusätzlich:
-- Marke
-- Produktgruppe
-- Barcode
-- Rollen
-- Mitarbeiter-Preisregel
-- MwSt.
-- Salon-Inventar-Anzahl
+## CSV
+Import ist weiterhin für den bereitgestellten Salonkee-Export vorbereitet.
