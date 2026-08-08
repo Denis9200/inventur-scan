@@ -1,22 +1,72 @@
-# Inventur Scan V6e – stabiler Barcode-Scan
+# Inventur Scan V7 – Lagerbestand, Verwendungszwecke & echter CSV-Import
 
-Problem:
-Beim schnellen 1D-Scan konnte Quagga während eines einzigen Kameraschwenks mehrere falsche Zwischenwerte liefern.
-Dadurch wurden verschiedene unbekannte Barcodes nacheinander als neue Artikel angeboten.
+## Echter CSV-Import
+Auf den hochgeladenen Export abgestimmt:
+- Name
+- Produktmarke
+- Produktgruppe
+- Preis
+- Einkaufspreis
+- Bestand
 
-Lösung:
-- EAN-/UPC-Prüfziffer wird validiert.
-- Der erste Decoder-Treffer wird NICHT mehr sofort akzeptiert.
-- Bekannte Artikel müssen mindestens 2x identisch erkannt werden.
-- Unbekannte Barcodes müssen mindestens 4x identisch erkannt werden.
-- Kandidaten verfallen nach kurzer Zeit automatisch.
-- Erst nach dieser Bestätigung wird das Kamerabild eingefroren und ein zweiter Decode durchgeführt.
-- Der zweite Decode darf den bereits stabil bestätigten Barcode nicht mehr durch einen zufälligen anderen Wert überschreiben.
-- Nach bestätigtem Scan wird der Decoder gesperrt, bis der Produktflow abgeschlossen ist.
+Die Datei darf wie der echte Export mit `Produkte` + Leerzeile beginnen.
+Die App sucht die tatsächliche Kopfzeile automatisch.
 
-Ergebnis:
-Ein einzelner Produktbarcode sollte jetzt nur noch genau einmal verarbeitet werden.
-Unbekannte Artikel werden erst angeboten, wenn derselbe Barcode wirklich stabil erkannt wurde.
+Wichtig: Der aktuelle Export enthält keine Barcode-Spalte.
+Daher gibt es bei unbekanntem Scan jetzt:
+- Weiter scannen
+- Vorhandenem Artikel zuordnen
+- Neuen Artikel anlegen
 
-Nach GitHub-Upload:
-PWA komplett schließen und neu öffnen.
+Damit kann ein gescannter Barcode einem bereits importierten CSV-Artikel zugeordnet werden.
+
+## Datenmodell
+Lagerbestand und Inventurzählung sind jetzt getrennt:
+- `stockByLocation` = aktueller operativer Lagerbestand
+- `counts` = Ist-Zählung während einer Inventur
+- `expected` = Sollbestand der Inventur
+
+## Verwendungszwecke pro Artikel
+Ein Artikel kann mehrere Rollen gleichzeitig haben:
+- Kundenverkauf
+- Mitarbeiterverkauf
+- Kabinettware
+- Inventar / Arbeitsmittel
+
+Beispiel Schneidkamm:
+Ein Teil bleibt normaler Lagerbestand, einzelne Stück können als Salon-Inventar ausgegeben werden.
+
+## Mitarbeiterverkauf
+- Artikel für Mitarbeiterverkauf freigeben
+- Standardpreis EK + MwSt.
+- MwSt.-Satz pro Artikel änderbar
+- alternativ fester Mitarbeiterpreis
+- Menge + Lagerort auswählen
+- Verkauf zieht direkt aus dem operativen Lagerbestand ab
+- Verlauf wird gespeichert
+
+## Inventar / Arbeitsmittel
+- Artikel als Arbeitsmittel freigeben
+- Stückzahl aus einem Lagerort ins Salon-Inventar ausgeben
+- Lagerbestand sinkt
+- Inventar-Anzahl steigt
+- Bereich / Einsatzort + Notiz möglich
+
+## Kabinettware
+Bestehende Gramm-/Tube-Logik bleibt erhalten:
+- Gramm pro VE
+- offene Tube
+- Entnahme
+- Schwund
+- Tube leer
+- neue Tube öffnet aus Lagerbestand
+
+## Artikelstamm
+Zusätzlich:
+- Marke
+- Produktgruppe
+- Barcode
+- Rollen
+- Mitarbeiter-Preisregel
+- MwSt.
+- Salon-Inventar-Anzahl

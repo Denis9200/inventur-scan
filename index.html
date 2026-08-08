@@ -184,10 +184,23 @@
       <div class="page-mode-hero">
         <div>
           <span class="kicker gold">BETRIEB</span>
-          <h2>Kabinettware & Verbrauch</h2>
-          <p>Produkte im täglichen Salonbetrieb erfassen – grammgenau, nachvollziehbar und direkt mit dem Lagerbestand verbunden.</p>
+          <h2>Salonbetrieb</h2>
+          <p>Kabinettware, Mitarbeiterverkauf und Arbeitsmittel direkt mit dem Lagerbestand verbinden.</p>
         </div>
         <button class="btn gold-btn" id="cabinetScanBtn">▣ Kabinettware scannen</button>
+      </div>
+
+
+      <div class="operation-modes">
+        <button class="operation-mode active" data-opmode="cabinet">
+          <b>◉</b><span>Kabinettware</span><small>Verbrauch in Gramm</small>
+        </button>
+        <button class="operation-mode" data-opmode="employee">
+          <b>€</b><span>Mitarbeiterverkauf</span><small>z. B. EK + MwSt.</small>
+        </button>
+        <button class="operation-mode" data-opmode="assets">
+          <b>⌘</b><span>Inventar / Arbeitsmittel</span><small>Salonbestand getrennt führen</small>
+        </button>
       </div>
 
       <div class="metric-grid">
@@ -209,6 +222,7 @@
         </article>
       </div>
 
+      <div id="op-cabinet" class="operation-panel active">
       <div class="dashboard-grid">
         <article class="panel">
           <div class="panel-head">
@@ -242,6 +256,43 @@
           <div id="cabinetSuggestions" class="suggestions hidden"></div>
         </div>
         <div id="cabinetProductCards" class="card-list"></div>
+      </div>
+      </div>
+
+      <div id="op-employee" class="operation-panel">
+        <div class="content-card">
+          <div class="section-head">
+            <div><span class="kicker gold">MITARBEITERVERKAUF</span><h2>Artikel verkaufen</h2><p>Standardpreis kann automatisch aus EK + MwSt. berechnet werden.</p></div>
+            <button class="btn gold-btn" id="employeeScanBtn">▣ Barcode scannen</button>
+          </div>
+          <div class="article-search-wrap">
+            <div class="article-search-line">
+              <input id="employeeSearch" placeholder="Artikel oder Barcode suchen …" autocomplete="off">
+              <button class="btn dark-btn" id="employeeFindBtn">Auswählen</button>
+            </div>
+            <div id="employeeSuggestions" class="suggestions hidden"></div>
+          </div>
+          <div id="employeeSaleHistory" class="activity-list empty" style="margin-top:14px">Noch keine Mitarbeiterverkäufe.</div>
+        </div>
+      </div>
+
+      <div id="op-assets" class="operation-panel">
+        <div class="dashboard-grid">
+          <article class="panel">
+            <div class="panel-head"><div><span class="kicker gold">ARBEITSMITTEL</span><h3>Als Inventar ausgeben</h3></div><button class="btn gold-btn" id="assetScanBtn">▣ Scannen</button></div>
+            <div class="article-search-wrap">
+              <div class="article-search-line">
+                <input id="assetSearch" placeholder="z. B. Schneidkamm …" autocomplete="off">
+                <button class="btn dark-btn" id="assetFindBtn">Auswählen</button>
+              </div>
+              <div id="assetSuggestions" class="suggestions hidden"></div>
+            </div>
+          </article>
+          <article class="panel">
+            <span class="kicker gold">SALON-INVENTAR</span><h3>Aktive Arbeitsmittel</h3>
+            <div id="assetList" class="activity-list empty">Noch keine Arbeitsmittel ausgegeben.</div>
+          </article>
+        </div>
       </div>
     </section>
 
@@ -469,6 +520,55 @@
   </div>
 </dialog>
 
+
+<dialog id="employeeSaleDialog" class="edit-product-dialog">
+  <div class="edit-product-body">
+    <div class="dialog-head">
+      <div><span class="kicker gold">MITARBEITERVERKAUF</span><h2 id="esName">Artikel</h2><p id="esMeta"></p></div>
+      <button class="round-btn" id="esClose">×</button>
+    </div>
+    <div class="edit-grid">
+      <label class="field"><span>Lagerort</span><select id="esLocation"></select></label>
+      <label class="field"><span>Menge</span><input id="esQty" type="number" min="1" value="1"></label>
+      <label class="field"><span>Preis pro Stück €</span><input id="esPrice" type="number" min="0" step="0.01"></label>
+      <label class="field"><span>Mitarbeiter / Notiz</span><input id="esEmployee" placeholder="optional"></label>
+    </div>
+    <div class="edit-summary">
+      <div><span>EK</span><strong id="esEk">0,00 €</strong></div>
+      <div><span>Mitarbeiterpreis</span><strong id="esUnitPrice">0,00 €</strong></div>
+      <div><span>Gesamt</span><strong id="esTotalPrice">0,00 €</strong></div>
+    </div>
+    <button class="btn gold-btn full" id="esSave">Verkauf buchen</button>
+  </div>
+</dialog>
+
+<dialog id="assetDialog" class="edit-product-dialog">
+  <div class="edit-product-body">
+    <div class="dialog-head">
+      <div><span class="kicker gold">INVENTAR / ARBEITSMITTEL</span><h2 id="asName">Artikel</h2><p id="asMeta"></p></div>
+      <button class="round-btn" id="asClose">×</button>
+    </div>
+    <div class="edit-grid">
+      <label class="field"><span>Aus Lagerort</span><select id="asLocation"></select></label>
+      <label class="field"><span>Anzahl ins Salon-Inventar</span><input id="asQty" type="number" min="1" value="1"></label>
+      <label class="field"><span>Bereich / Einsatzort</span><input id="asArea" placeholder="z. B. Platz 3"></label>
+      <label class="field"><span>Notiz</span><input id="asNote" placeholder="optional"></label>
+    </div>
+    <button class="btn gold-btn full" id="asSave">Als Inventar ausgeben</button>
+  </div>
+</dialog>
+
+<dialog id="assignBarcodeDialog" class="edit-product-dialog">
+  <div class="edit-product-body">
+    <div class="dialog-head">
+      <div><span class="kicker gold">BARCODE ZUORDNEN</span><h2>Vorhandenen Artikel auswählen</h2><p>Der gescannte Barcode <strong id="assignBarcodeValue"></strong> wird dem gewählten Artikel zugeordnet.</p></div>
+      <button class="round-btn" id="assignClose">×</button>
+    </div>
+    <input id="assignSearch" placeholder="Artikelname suchen …" autocomplete="off">
+    <div id="assignResults" class="assign-results"></div>
+  </div>
+</dialog>
+
 <dialog id="unknownBarcodeDialog" class="unknown-barcode-dialog">
   <div class="unknown-barcode-body">
     <div class="unknown-icon">?</div>
@@ -476,9 +576,10 @@
     <h2>Artikel nicht gefunden</h2>
     <p>Der Barcode <strong id="unknownBarcodeValue">–</strong> ist noch keinem Artikel zugeordnet.</p>
     <p>Möchtest du diesen Artikel jetzt neu anlegen?</p>
-    <div class="unknown-actions">
-      <button class="btn dark-btn" id="unknownNo">Nein, weiter scannen</button>
-      <button class="btn gold-btn" id="unknownYes">Ja, Artikel anlegen</button>
+    <div class="unknown-actions unknown-actions-three">
+      <button class="btn dark-btn" id="unknownNo">Weiter scannen</button>
+      <button class="btn dark-btn" id="unknownAssign">Vorhandenem Artikel zuordnen</button>
+      <button class="btn gold-btn" id="unknownYes">Neuen Artikel anlegen</button>
     </div>
   </div>
 </dialog>
@@ -501,6 +602,14 @@
       <label class="field">
         <span>Barcode</span>
         <input id="epBarcode" inputmode="numeric">
+      </label>
+      <label class="field">
+        <span>Marke / Hersteller</span>
+        <input id="epBrand">
+      </label>
+      <label class="field">
+        <span>Produktgruppe</span>
+        <input id="epGroup">
       </label>
       <label class="field">
         <span>Sollbestand</span>
@@ -531,11 +640,44 @@
       </label>
     </div>
 
+
+    <div class="edit-section">
+      <span class="kicker gold">VERWENDUNG</span>
+      <h3>Wofür darf dieser Artikel verwendet werden?</h3>
+      <div class="role-grid">
+        <label class="role-check"><input id="roleRetail" type="checkbox"><div><strong>Kundenverkauf</strong><small>Normale Ladenware</small></div></label>
+        <label class="role-check"><input id="roleEmployee" type="checkbox"><div><strong>Mitarbeiterverkauf</strong><small>z. B. EK + MwSt.</small></div></label>
+        <label class="role-check"><input id="roleCabinet" type="checkbox"><div><strong>Kabinettware</strong><small>Verbrauch im Betrieb</small></div></label>
+        <label class="role-check"><input id="roleAsset" type="checkbox"><div><strong>Inventar / Arbeitsmittel</strong><small>Bleibt im Salon</small></div></label>
+      </div>
+      <div class="edit-grid role-settings">
+        <label class="field">
+          <span>Mitarbeiter-Preisregel</span>
+          <select id="epEmployeePricing">
+            <option value="ek_vat">EK + MwSt.</option>
+            <option value="fixed">Fester Mitarbeiterpreis</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>MwSt. für Mitarbeiterverkauf (%)</span>
+          <input id="epVatRate" type="number" min="0" step="0.1" value="19">
+        </label>
+        <label class="field">
+          <span>Fester Mitarbeiterpreis €</span>
+          <input id="epEmployeePrice" type="number" min="0" step="0.01">
+        </label>
+        <label class="field">
+          <span>Als Inventar ausgegeben</span>
+          <input id="epAssetCount" type="number" min="0" step="1">
+        </label>
+      </div>
+    </div>
+
     <div class="edit-section">
       <div class="section-head">
         <div>
           <span class="kicker gold">LAGERORTE</span>
-          <h3>Mengen pro Lagerort</h3>
+          <h3>Aktueller Lagerbestand pro Lagerort</h3>
         </div>
       </div>
       <div id="epLocations" class="edit-locations"></div>
