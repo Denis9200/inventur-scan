@@ -1,7 +1,7 @@
 
 const $=id=>document.getElementById(id);
 const KEY='dj_inventur_v5_step1', HIST='dj_inventur_history_v5';
-let products=[],locations=['Salon','Keller'],recent=[],current=null,scanner=null,articleScanner=null,fullScanner=null,lastScan='',theme='dark',activeLocationDetail=null,scanProduct=null,scanRestartAfterSave=false,fullFacing='environment',editProduct=null,quaggaActive=false;
+let products=[],locations=['Salon','Keller'],recent=[],current=null,scanner=null,articleScanner=null,fullScanner=null,lastScan='',theme='dark',activeLocationDetail=null,scanProduct=null,scanRestartAfterSave=false,fullFacing='environment',editProduct=null,quaggaActive=false,scanConfirming=false;
 
 const num=v=>{const x=Number(String(v??'').replace(',','.'));return Number.isFinite(x)?x:0};
 const tx=v=>String(v??'').trim();
@@ -262,6 +262,7 @@ function saveScanProduct(restart){
 }
 
 async function openFullScanner(){
+ scanConfirming=false;
  if(typeof Quagga==='undefined'){
    toast('Barcode-Scanner konnte nicht geladen werden');
    return;
@@ -322,30 +323,110 @@ async function openFullScanner(){
  }
 }
 
-function handleQuaggaDetected(result){
- const code=result?.codeResult?.code;
- if(!code || code===lastScan)return;
 
- // Filter obvious unstable reads. EAN/UPC should be numeric and reasonably long.
+function normalizeBarcode(v){
+ return String(v||'').trim().replace(/\s+/g,'');
+}
+function findBarcodeFlexible(code){
+ const raw=normalizeBarcode(code);
+ let p=find(raw);
+ if(p)return p;
+ // Some decoders/browser combinations may add/remove a UPC/EAN leading zero.
+ const numeric=raw.replace(/\D/g,'');
+ const candidates=[raw,numeric];
+ if(numeric.length===12)candidates.push('0'+numeric);
+ if(numeric.length===13 && numeric.startsWith('0'))candidates.push(numeric.slice(1));
+ return products.find(x=>{
+   const b=normalizeBarcode(x.barcode).replace(/\D/g,'');
+   return candidates.includes(normalizeBarcode(x.barcode)) || candidates.includes(b);
+ });
+}
+async function confirmBarcodeFromFrame(firstCode){
+ if(scanConfirming)return;
+ scanConfirming=true;
+
+ const video=document.querySelector('#quaggaReader video');
+ let imageData=null;
+
+ try{
+   if(video && video.videoWidth && video.videoHeight){
+     const canvas=document.createElement('canvas');
+     canvas.width=video.videoWidth;
+     canvas.height=video.videoHeight;
+     const ctx=canvas.getContext('2d',{willReadFrequently:true});
+     ctx.drawImage(video,0,0,canvas.width,canvas.height);
+     imageData=canvas.toDataURL('image/jpeg',0.96);
+   }
+
+   // Freeze live scanning while the captured frame is checked.
+   try{
+     if(quaggaActive){
+       Quagga.offDetected(handleQuaggaDetected);
+       Quagga.stop();
+       quaggaActive=false;
+     }
+   }catch(e){}
+
+   let confirmed=normalizeBarcode(firstCode);
+
+   // Second independent decode of the captured camera frame.
+   if(imageData){
+     try{
+       const result=await new Promise((resolve,reject)=>{
+         Quagga.decodeSingle({
+           src:imageData,
+           numOfWorkers:0,
+           locate:true,
+           locator:{patchSize:'medium',halfSample:false},
+           decoder:{readers:[
+             'ean_reader','ean_8_reader','upc_reader','upc_e_reader',
+             'code_128_reader','code_39_reader','i2of5_reader'
+           ]}
+         },r=>r?.codeResult?.code?resolve(r):reject(new Error('Kein zweiter Treffer')));
+       });
+       confirmed=normalizeBarcode(result.codeResult.code);
+     }catch(e){
+       // The live result is still useful if the snapshot cannot decode.
+     }
+   }
+
+   const p=findBarcodeFlexible(confirmed) || findBarcodeFlexible(firstCode);
+   await closeFullScanner(false);
+
+   if(p){
+     if(navigator.vibrate)navigator.vibrate([70,40,70]);
+     openScanProduct(p,true);
+   }else{
+     toast('Barcode '+confirmed+' erkannt – Artikel nicht gefunden');
+     // Keep the result visible, then return to scanner automatically.
+     setTimeout(()=>openFullScanner(),1100);
+   }
+ }catch(e){
+   console.error('scan confirmation error',e);
+   try{await closeFullScanner(false)}catch(_){}
+   toast('Barcode konnte nicht bestätigt werden');
+   setTimeout(()=>openFullScanner(),900);
+ }finally{
+   scanConfirming=false;
+ }
+}
+function handleQuaggaDetected(result){
+ const code=normalizeBarcode(result?.codeResult?.code);
+ if(!code || code===lastScan || scanConfirming)return;
+
  const format=result?.codeResult?.format||'';
  if(/ean|upc/i.test(format) && !/^\d{7,14}$/.test(code))return;
 
  lastScan=code;
- setTimeout(()=>lastScan='',1800);
+ setTimeout(()=>lastScan='',2000);
 
  const frame=document.querySelector('.scan-frame');
  frame?.classList.add('detected');
- setTimeout(()=>frame?.classList.remove('detected'),350);
+ setTimeout(()=>frame?.classList.remove('detected'),450);
 
- if(navigator.vibrate)navigator.vibrate(90);
-
- const p=find(code);
- if(!p){
-   toast('Barcode '+code+' erkannt – Artikel nicht gefunden');
-   return;
- }
-
- closeFullScanner(false).then(()=>openScanProduct(p,true));
+ // Green means: candidate found. Now freeze/capture the current frame
+ // and decode that image a second time before opening the product.
+ confirmBarcodeFromFrame(code);
 }
 
 async function closeFullScanner(showIdle=true){
