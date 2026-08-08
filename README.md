@@ -1,35 +1,22 @@
-# Inventur Scan V6d – Runtime-/Button-Fix
+# Inventur Scan V6e – stabiler Barcode-Scan
 
-## Gefundener Fehler
-Beim V6-Umbau wurde der Button `demoBtn` aus dem Dashboard entfernt.
-In `app.js` stand aber weiterhin:
+Problem:
+Beim schnellen 1D-Scan konnte Quagga während eines einzigen Kameraschwenks mehrere falsche Zwischenwerte liefern.
+Dadurch wurden verschiedene unbekannte Barcodes nacheinander als neue Artikel angeboten.
 
-`$('demoBtn').addEventListener(...)`
+Lösung:
+- EAN-/UPC-Prüfziffer wird validiert.
+- Der erste Decoder-Treffer wird NICHT mehr sofort akzeptiert.
+- Bekannte Artikel müssen mindestens 2x identisch erkannt werden.
+- Unbekannte Barcodes müssen mindestens 4x identisch erkannt werden.
+- Kandidaten verfallen nach kurzer Zeit automatisch.
+- Erst nach dieser Bestätigung wird das Kamerabild eingefroren und ein zweiter Decode durchgeführt.
+- Der zweite Decode darf den bereits stabil bestätigten Barcode nicht mehr durch einen zufälligen anderen Wert überschreiben.
+- Nach bestätigtem Scan wird der Decoder gesperrt, bis der Produktflow abgeschlossen ist.
 
-Da das Element nicht mehr existierte, entstand beim Laden der App ein JavaScript-Fehler.
-Der Browser brach die weitere Initialisierung ab. Deshalb reagierten danach u. a.:
+Ergebnis:
+Ein einzelner Produktbarcode sollte jetzt nur noch genau einmal verarbeitet werden.
+Unbekannte Artikel werden erst angeboten, wenn derselbe Barcode wirklich stabil erkannt wurde.
 
-- Kamera / Scanner
-- „+ Neuer Artikel“
-- Popups
-- weitere Buttons
-
-nicht mehr.
-
-## Behoben
-- Zugriff auf den optionalen Demo-Button ist jetzt abgesichert.
-- Service-Worker-Cache erneut geändert, damit die defekte JS-Datei nicht weiter geladen wird.
-- Statischer UI-Check: Keine fehlenden direkten Event-Ziele gefunden.
-
-Die Funktionen aus V6 bleiben erhalten:
-- Inventur
-- Quagga2 Barcode-Scanner
-- unbekannte Barcodes → Artikel anlegen
-- Lagerbestand / Artikel bearbeiten
-- Betrieb
-- Kabinettware in Gramm
-- Tube leer
-- Schwund / Verlust
-- Verbrauchshistorie
-
-Nach GitHub-Upload die PWA komplett schließen und neu öffnen.
+Nach GitHub-Upload:
+PWA komplett schließen und neu öffnen.
